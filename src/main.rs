@@ -59,6 +59,7 @@ pub struct Config {
     pub spotify_secret_id: String,
     pub db_url: String,
     pub enc_key: String,
+    pub poll_interval_seconds: u64,
 }
 impl Config {
     pub fn load() -> Self {
@@ -83,6 +84,9 @@ impl Config {
             spotify_secret_id: env_or("SPOTIFY_SECRET_ID", "fake"),
             db_url: env_or("DATABASE_URL", "error"),
             enc_key: env_or("ENC_KEY", "01234567890123456789012345678901"),
+            poll_interval_seconds: env_or("POLL_INTERVAL_SECONDS", "10")
+                .parse()
+                .expect("invalid poll_interval_seconds"),
         }
     }
     pub fn initialize(&self) -> anyhow::Result<()> {
@@ -115,11 +119,19 @@ struct Auth {
     state: String,
 }
 
-async fn new_state_token() -> String {
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct Token {
+    token: String,
+    redirect: Option<String>,
+}
+
+async fn new_state_token(redirect: Option<String>) -> String {
     let s = uuid::Uuid::new_v4()
         .to_simple()
         .encode_lower(&mut uuid::Uuid::encode_buffer())
         .to_string();
+    let s = serde_json::to_string(&Token { token: s, redirect }).expect("token json error");
+    let s = base64::encode(&s);
     let mut lock = STATE_KEYS.lock().await;
     lock.cache_set(s.clone(), ());
     s
@@ -130,13 +142,19 @@ async fn is_valid_state(s: String) -> bool {
     lock.cache_remove(&s).is_some()
 }
 
-async fn login(_req: tide::Request<Context>) -> tide::Result {
-    let token = new_state_token().await;
+#[derive(serde::Deserialize)]
+struct MaybeRedirect {
+    redirect: Option<String>,
+}
+
+async fn login(req: tide::Request<Context>) -> tide::Result {
+    let maybe_redirect: MaybeRedirect = req.query().expect("query parse error");
+    let token = new_state_token(maybe_redirect.redirect.clone()).await;
     slog::info!(
         LOG,
-        "redirecting to spotify with token {}, url {}",
+        "redirecting to spotify auth with token {}, post-redirect-redirect {:?}",
         token,
-        CONFIG.spotify_redirect_url()
+        maybe_redirect.redirect,
     );
     Ok(tide::Redirect::new(
         format!("https://accounts.spotify.com/authorize?client_id={id}&response_type=code&redirect_uri={redirect}&scope={scope}&state={state}",
@@ -248,6 +266,8 @@ struct User {
     refresh_nonce: String,
     access_expires: i64,
     auth_token: String,
+    created: chrono::DateTime<chrono::Utc>,
+    modified: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(serde::Deserialize)]
@@ -316,7 +336,8 @@ async fn upsert_user(
         on conflict (email) do update set name = excluded.name, scopes = excluded.scopes, 
         access_token = excluded.access_token, access_nonce = excluded.access_nonce, 
         refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce, 
-        access_expires = excluded.access_expires, auth_token = excluded.auth_token 
+        access_expires = excluded.access_expires, auth_token = excluded.auth_token, 
+        modified = now()
         returning *
         ",
         &name_email.email,
@@ -346,10 +367,11 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
             }))
             .build());
     }
-    slog::info!(LOG, "new auth"; "token" => &auth.state);
-    let access = new_access_token(&auth.code).await.expect("access error");
+    let token_bytes = base64::decode(&auth.state).expect("decode error");
+    let token_str = String::from_utf8(token_bytes).expect("token utf8 error");
+    let token: Token = serde_json::from_str(&token_str).expect("deserialize token error");
 
-    slog::info!(LOG, "new access {:?}", access);
+    let access = new_access_token(&auth.code).await.expect("access error");
     let name_email = get_new_user_name_email(&access)
         .await
         .expect("error getting name error");
@@ -358,7 +380,7 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
     let user = upsert_user(&ctx.pool, &access, &name_email, &new_auth_token)
         .await
         .expect("user upsert error");
-    slog::info!(LOG, "user: {:?}", user);
+    slog::info!(LOG, "completing user login: {}", user.id);
 
     let cookie_str = format!(
         "auth_token={token}; Domain={domain}; HttpOnly; Max-Age={max_age}",
@@ -366,7 +388,16 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
         domain = &CONFIG.domain(),
         max_age = 60 * 24 * 30,
     );
-    slog::info!(LOG, "setting cookie {}", cookie_str);
+
+    if let Some(redirect) = token.redirect {
+        if !redirect.contains("login") {
+            slog::info!(LOG, "found login redirect {:?}", redirect);
+            let mut resp: tide::Response =
+                tide::Redirect::new(format!("{}{}", CONFIG.host(), redirect)).into();
+            resp.insert_header("set-cookie", cookie_str);
+            return Ok(resp);
+        }
+    }
     Ok(tide::Response::builder(200)
         .header("set-cookie", cookie_str)
         .body(serde_json::json!({
@@ -407,7 +438,7 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
     sqlx::query_as!(
         User,
         "
-        update users set access_token = $1, access_nonce = $2 where id = $3 returning *
+        update users set access_token = $1, access_nonce = $2, modified = now() where id = $3 returning *
         ",
         &enc_access.value,
         &enc_access.nonce,
@@ -420,37 +451,27 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
     access.access_token
 }
 
-// struct Artist {
-//     name: String,
-// }
-//
-// struct Track {
-//     name: String,
-//     artists: Vec<Artist>,
-// }
-//
-// struct HistItem {
-//     track: Track,
-//     played_at: String,
-// }
-//
-// struct Cursors {
-//     after: String,
-//     before: String,
-// }
-//
-// struct HistResp {
-//     items: Vec<HistItem>,
-//     cursors: Cursors,
-// }
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
+struct Track {
+    id: i64,
+    user_id: i64,
+    spotify_id: String,
+    played: chrono::DateTime<chrono::Utc>,
+    name: String,
+    created: chrono::DateTime<chrono::Utc>,
+    modified: chrono::DateTime<chrono::Utc>,
+    raw: serde_json::Value,
+}
 
 async fn get_history(pool: &PgPool, user: &User) -> serde_json::Value {
     let access_token = get_user_access_token(pool, user).await;
-    let mut resp = surf::get("https://api.spotify.com/v1/me/player/recently-played?limit=50")
-        .header("authorization", format!("Bearer {}", access_token))
-        .send()
-        .await
-        .expect("get history error");
+    let mut resp = surf::get(format!(
+        "https://api.spotify.com/v1/me/player/recently-played?limit=50",
+    ))
+    .header("authorization", format!("Bearer {}", access_token))
+    .send()
+    .await
+    .expect("get history error");
     let resp: serde_json::Value = resp.body_json().await.expect("json error");
     resp
 }
@@ -458,11 +479,21 @@ async fn get_history(pool: &PgPool, user: &User) -> serde_json::Value {
 async fn recent(req: tide::Request<Context>) -> tide::Result {
     let user = get_auth_user(&req).await;
     if user.is_none() {
-        return Ok(tide::Redirect::new(format!("{}/login", CONFIG.host())).into());
+        let path = req.url().path();
+        return Ok(
+            tide::Redirect::new(format!("{}/login?redirect={}", CONFIG.host(), path)).into(),
+        );
     }
     let user = user.unwrap();
     let ctx = req.state();
-    let history = get_history(&ctx.pool, &user).await;
+    let history = sqlx::query_as!(
+        Track,
+        "select * from tracks where user_id = $1 order by played asc",
+        &user.id
+    )
+    .fetch_all(&ctx.pool)
+    .await
+    .expect("error getting tracks for user");
 
     Ok(serde_json::json!({
         "ok": "ok",
@@ -492,6 +523,48 @@ async fn get_auth_user(req: &tide::Request<Context>) -> Option<User> {
     }
 }
 
+async fn background_poll(pool: PgPool) {
+    loop {
+        async_std::task::sleep(std::time::Duration::from_secs(CONFIG.poll_interval_seconds)).await;
+        let users = sqlx::query_as!(User, "select * from users",)
+            .fetch_all(&pool)
+            .await
+            .expect("error getting users");
+        slog::info!(LOG, "poll users {:?}", users);
+        for user in &users {
+            let recent = get_history(&pool, user).await;
+            for item in recent["items"].as_array().unwrap() {
+                let played = item["played_at"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<chrono::DateTime<chrono::Utc>>()
+                    .unwrap();
+                let spotify_id = item["track"]["id"].as_str().unwrap();
+                let name = item["track"]["name"].as_str().unwrap();
+                let track = sqlx::query_as!(
+                    Track,
+                    "
+                    insert into tracks
+                    (user_id, spotify_id, played, name, raw)
+                    values
+                    ($1, $2, $3, $4, $5)
+                    on conflict (spotify_id, played) do update set modified = now()
+                    returning *
+                    ",
+                    &user.id,
+                    spotify_id,
+                    played,
+                    name,
+                    item,
+                )
+                .fetch_one(&pool)
+                .await
+                .expect("failed insert track");
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 struct Context {
     pool: sqlx::PgPool,
@@ -505,6 +578,7 @@ async fn main() -> tide::Result<()> {
         .max_connections(5)
         .connect(&CONFIG.db_url)
         .await?;
+    async_std::task::spawn(background_poll(pool.clone()));
     let ctx = Context { pool };
     let mut app = tide::with_state(ctx);
     app.at("/login").get(login);
