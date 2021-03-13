@@ -584,6 +584,12 @@ async fn background_poll(pool: PgPool) {
     }
 }
 
+async fn index(_req: tide::Request<Context>) -> tide::Result {
+    slog::info!(LOG, "index redirecting to /recent");
+    let resp: tide::Response = tide::Redirect::new(format!("{}/recent", CONFIG.host())).into();
+    return Ok(resp);
+}
+
 #[derive(Clone)]
 struct Context {
     pool: sqlx::PgPool,
@@ -600,6 +606,7 @@ async fn main() -> tide::Result<()> {
     async_std::task::spawn(background_poll(pool.clone()));
     let ctx = Context { pool };
     let mut app = tide::with_state(ctx);
+    app.at("/").get(index);
     app.at("/login").get(login);
     app.at("/auth").get(auth);
     app.at("/recent").get(recent);
