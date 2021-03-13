@@ -14,4 +14,5 @@
 * `migrant apply -a`
 * Create a spotify "app" here https://developer.spotify.com/dashboard/applications
 * Copy your `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to your `.env.local`
+* `source .env`, or use a tool like autoenv  
 * `cargo run`
