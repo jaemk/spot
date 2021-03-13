@@ -548,7 +548,7 @@ async fn background_poll(pool: PgPool) {
                     (user_id, spotify_id, played, name, raw)
                     values
                     ($1, $2, $3, $4, $5)
-                    on conflict (spotify_id, played) do update set modified = now()
+                    on conflict (user_id, spotify_id, played) do update set modified = now()
                     returning *
                     ",
                     &user.id,
