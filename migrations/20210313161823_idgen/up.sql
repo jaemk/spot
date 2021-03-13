@@ -1,3 +1,4 @@
+begin;
 create sequence spot.id_seq;
 create or replace function spot.id_gen(out result bigint) as $$
 declare
@@ -17,3 +18,4 @@ begin
     result := result | (seq_id);
 end;
 $$ language plpgsql;
+commit;

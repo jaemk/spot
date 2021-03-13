@@ -1,3 +1,4 @@
+begin;
 create table spot.users (
    id int8 primary key default spot.id_gen(),
    email text unique not null,
@@ -14,3 +15,4 @@ create table spot.users (
 );
 create index users_auth_token on spot.users(auth_token);
 create index users_email on spot.users(email);
+commit;

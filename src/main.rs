@@ -257,14 +257,32 @@ fn decrypt(enc: &Enc) -> String {
 #[derive(sqlx::FromRow, Debug)]
 struct User {
     id: i64,
+    // email reported by spotify, we're assuming this is unique
+    // since it's the account email of the spotify account.
     email: String,
+    // name reported by spotify
     name: String,
+    // the spotify scopes available to the access_token
     scopes: Vec<String>,
+    // a spotify access token that can be used to access
+    // the spotify user's info. This value is AWS_256_GCM
+    // encrypted using the application secret set in the
+    // current environment and the `access_nonce` generated
+    // when the value was originally encrypted.
     access_token: String,
     access_nonce: String,
+    // a spotify token that can be used to refresh the spotify
+    // user's access_token. This is encrypted and stored the
+    // same way as the actual access_token.
     refresh_token: String,
     refresh_nonce: String,
+    // timestamp in seconds from epoch when the current
+    // spotify access_token expires
     access_expires: i64,
+    // a user's (of this application) authentication token
+    // that is set as cookie on a user's session. This value
+    // stored is the hmac (and hex encoded) string of the
+    // actual token returned to the user.
     auth_token: String,
     created: chrono::DateTime<chrono::Utc>,
     modified: chrono::DateTime<chrono::Utc>,
@@ -325,7 +343,7 @@ async fn upsert_user(
         User,
         "
         insert into 
-        users (
+        spot.users (
             email, name, scopes,
             access_token, access_nonce,
             refresh_token, refresh_nonce,
@@ -438,7 +456,7 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
     sqlx::query_as!(
         User,
         "
-        update users set access_token = $1, access_nonce = $2, modified = now() where id = $3 returning *
+        update spot.users set access_token = $1, access_nonce = $2, modified = now() where id = $3 returning *
         ",
         &enc_access.value,
         &enc_access.nonce,
@@ -452,11 +470,11 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
-struct Track {
+struct Play {
     id: i64,
     user_id: i64,
     spotify_id: String,
-    played: chrono::DateTime<chrono::Utc>,
+    played_at: chrono::DateTime<chrono::Utc>,
     name: String,
     created: chrono::DateTime<chrono::Utc>,
     modified: chrono::DateTime<chrono::Utc>,
@@ -464,7 +482,7 @@ struct Track {
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
-struct NewTrack {
+struct NewPlay {
     id: i64,
     created: chrono::DateTime<chrono::Utc>,
     modified: chrono::DateTime<chrono::Utc>,
@@ -494,13 +512,13 @@ async fn recent(req: tide::Request<Context>) -> tide::Result {
     let user = user.unwrap();
     let ctx = req.state();
     let history = sqlx::query_as!(
-        Track,
-        "select * from tracks where user_id = $1 order by played desc",
+        Play,
+        "select * from spot.plays where user_id = $1 order by played_at desc",
         &user.id
     )
     .fetch_all(&ctx.pool)
     .await
-    .expect("error getting tracks for user");
+    .expect("error getting plays for user");
 
     Ok(serde_json::json!({
         "ok": "ok",
@@ -520,10 +538,14 @@ async fn get_auth_user(req: &tide::Request<Context>) -> Option<User> {
             let token = cookie.value();
             println!("token={}", token);
             let hash = crypto::hmac_sign(token);
-            let u = sqlx::query_as!(User, "select * from users where auth_token = $1", &hash)
-                .fetch_one(&ctx.pool)
-                .await
-                .ok();
+            let u = sqlx::query_as!(
+                User,
+                "select * from spot.users where auth_token = $1",
+                &hash
+            )
+            .fetch_one(&ctx.pool)
+            .await
+            .ok();
             println!("maybe user {:?}", u);
             u
         }
@@ -533,7 +555,7 @@ async fn get_auth_user(req: &tide::Request<Context>) -> Option<User> {
 async fn background_poll(pool: PgPool) {
     loop {
         async_std::task::sleep(std::time::Duration::from_secs(CONFIG.poll_interval_seconds)).await;
-        let users = sqlx::query_as!(User, "select * from users",)
+        let users = sqlx::query_as!(User, "select * from spot.users",)
             .fetch_all(&pool)
             .await
             .expect("error getting users");
@@ -546,7 +568,7 @@ async fn background_poll(pool: PgPool) {
                 .collect::<Vec<&str>>()
         );
         for user in &users {
-            let mut new_tracks = vec![];
+            let mut new_plays = vec![];
             let recent = get_history(&pool, user).await;
             for item in recent["items"].as_array().unwrap() {
                 let played = item["played_at"]
@@ -556,14 +578,14 @@ async fn background_poll(pool: PgPool) {
                     .unwrap();
                 let spotify_id = item["track"]["id"].as_str().unwrap();
                 let name = item["track"]["name"].as_str().unwrap();
-                let new_track = sqlx::query_as!(
-                    NewTrack,
+                let new_play = sqlx::query_as!(
+                    NewPlay,
                     "
-                    insert into tracks
-                    (user_id, spotify_id, played, name, raw)
+                    insert into spot.plays
+                    (user_id, spotify_id, played_at, name, raw)
                     values
                     ($1, $2, $3, $4, $5)
-                    on conflict (user_id, spotify_id, played) do update set modified = now()
+                    on conflict (user_id, spotify_id, played_at) do update set modified = now()
                     returning id, created, modified
                     ",
                     &user.id,
@@ -574,12 +596,12 @@ async fn background_poll(pool: PgPool) {
                 )
                 .fetch_one(&pool)
                 .await
-                .expect("failed insert track");
-                if new_track.created == new_track.modified {
-                    new_tracks.push(new_track.id);
+                .expect("failed to insert play");
+                if new_play.created == new_play.modified {
+                    new_plays.push(new_play.id);
                 }
             }
-            slog::info!(LOG, "inserted new tracks {:?}", new_tracks);
+            slog::info!(LOG, "inserted new plays {:?}", new_plays);
         }
     }
 }
@@ -611,6 +633,8 @@ async fn main() -> tide::Result<()> {
     app.at("/auth").get(auth);
     app.at("/recent").get(recent);
     app.with(tide::log::LogMiddleware::new());
+
+    slog::info!(LOG, "running at {}", CONFIG.host());
     app.listen(CONFIG.host()).await?;
     Ok(())
 }
