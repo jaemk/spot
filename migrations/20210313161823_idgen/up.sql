@@ -1,11 +1,11 @@
-create sequence id_seq;
-create or replace function id_gen(out result bigint) as $$
+create sequence spot.id_seq;
+create or replace function spot.id_gen(out result bigint) as $$
 declare
     id_epoch bigint := 1609121549443;
     seq_id bigint;
     now_millis bigint;
 begin
-    select nextval('id_seq') % 1048576 into seq_id;
+    select nextval('spot.id_seq') % 1048576 into seq_id;
     select floor(extract(epoch from clock_timestamp()) * 1000) into now_millis;
     -- we're starting with a bigint so 64 bits
     -- shifting over 20 bits uses the lower 44 bits of our millis timestamp

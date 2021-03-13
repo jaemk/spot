@@ -1,0 +1,21 @@
+
+# Required, do not edit
+database_type = "postgres"
+
+# Required database info
+database_name = "env:DB_NAME"
+database_user = "env:DB_USER"
+database_password = "env:DB_PASS"
+
+# Configurable database info
+database_host = "env:DB_HOST"         # default "localhost"
+database_port = "env:DB_PORT"              # default "5432"
+migration_location = "migrations"  # default "migrations"
+
+# Extra database connection parameters
+# with the format:
+# [database_params]
+# key = "value"
+[database_params]
+
+
