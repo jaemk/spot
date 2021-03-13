@@ -41,7 +41,7 @@ lazy_static::lazy_static! {
     };
 
     // Base logger
-    pub static ref LOG: slog::Logger = BASE_LOG.new(slog::o!("app" => "dev"));
+    pub static ref LOG: slog::Logger = BASE_LOG.new(slog::o!("app" => "spistorfy"));
 
     // state cache
     pub static ref STATE_KEYS: Arc<Mutex<TimedCache<String, ()>>> = Arc::new(Mutex::new(TimedCache::with_lifespan(30)));
@@ -463,6 +463,13 @@ struct Track {
     raw: serde_json::Value,
 }
 
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
+struct NewTrack {
+    id: i64,
+    created: chrono::DateTime<chrono::Utc>,
+    modified: chrono::DateTime<chrono::Utc>,
+}
+
 async fn get_history(pool: &PgPool, user: &User) -> serde_json::Value {
     let access_token = get_user_access_token(pool, user).await;
     let mut resp = surf::get(format!(
@@ -488,7 +495,7 @@ async fn recent(req: tide::Request<Context>) -> tide::Result {
     let ctx = req.state();
     let history = sqlx::query_as!(
         Track,
-        "select * from tracks where user_id = $1 order by played asc",
+        "select * from tracks where user_id = $1 order by played desc",
         &user.id
     )
     .fetch_all(&ctx.pool)
@@ -530,8 +537,16 @@ async fn background_poll(pool: PgPool) {
             .fetch_all(&pool)
             .await
             .expect("error getting users");
-        slog::info!(LOG, "poll users {:?}", users);
+        slog::info!(
+            LOG,
+            "poll users {:?}",
+            users
+                .iter()
+                .map(|u| u.email.as_str())
+                .collect::<Vec<&str>>()
+        );
         for user in &users {
+            let mut new_tracks = vec![];
             let recent = get_history(&pool, user).await;
             for item in recent["items"].as_array().unwrap() {
                 let played = item["played_at"]
@@ -541,15 +556,15 @@ async fn background_poll(pool: PgPool) {
                     .unwrap();
                 let spotify_id = item["track"]["id"].as_str().unwrap();
                 let name = item["track"]["name"].as_str().unwrap();
-                let track = sqlx::query_as!(
-                    Track,
+                let new_track = sqlx::query_as!(
+                    NewTrack,
                     "
                     insert into tracks
                     (user_id, spotify_id, played, name, raw)
                     values
                     ($1, $2, $3, $4, $5)
                     on conflict (user_id, spotify_id, played) do update set modified = now()
-                    returning *
+                    returning id, created, modified
                     ",
                     &user.id,
                     spotify_id,
@@ -560,7 +575,11 @@ async fn background_poll(pool: PgPool) {
                 .fetch_one(&pool)
                 .await
                 .expect("failed insert track");
+                if new_track.created == new_track.modified {
+                    new_tracks.push(new_track.id);
+                }
             }
+            slog::info!(LOG, "inserted new tracks {:?}", new_tracks);
         }
     }
 }

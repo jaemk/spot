@@ -10,3 +10,4 @@ create table spot.tracks (
 );
 create unique index tracks_played_at_by_user on tracks(user_id, spotify_id, played);
 create index tracks_user on tracks(user_id);
+create index tracks_played on tracks(played);
