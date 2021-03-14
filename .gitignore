@@ -1,3 +1,4 @@
 /target
 server/.env
+server/env.bat
 .idea/
