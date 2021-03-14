@@ -1,7 +1,7 @@
 use async_mutex::Mutex;
 use cached::stores::TimedCache;
 use cached::Cached;
-use chrono::{TimeZone, Timelike};
+use chrono::{DateTime, TimeZone, Timelike, Utc};
 use slog::o;
 use slog::Drain;
 use sqlx::postgres::PgPoolOptions;
@@ -231,17 +231,22 @@ async fn new_access_token(code: &str) -> anyhow::Result<Access> {
     Ok(access)
 }
 
-async fn refresh_access_token(refresh_token: &str) -> anyhow::Result<Access> {
+async fn refresh_access_token(refresh_token: &str) -> Result<Access> {
     let auth = base64::encode(
         format!("{}:{}", CONFIG.spotify_client_id, CONFIG.spotify_secret_id).as_bytes(),
     );
+    let body = surf::Body::from_form(&RefreshParams::from_token(refresh_token))
+        .map_err(|_| "error generating form data from refresh params")?;
     let mut resp = surf::post("https://accounts.spotify.com/api/token")
-        .body(surf::Body::from_form(&RefreshParams::from_token(refresh_token)).expect("form error"))
+        .body(body)
         .header("authorization", format!("Basic {}", auth))
         .send()
         .await
-        .expect("account refresh request error");
-    let access: Access = resp.body_json().await.expect("json parse error");
+        .map_err(|e| format!("account refresh request error {:?}", e))?;
+    let access: Access = resp
+        .body_json()
+        .await
+        .map_err(|e| format!("account refresh json parse error {:?}", e))?;
     Ok(access)
 }
 
@@ -250,21 +255,22 @@ struct Enc {
     nonce: String,
 }
 
-fn encrypt(s: &str) -> Enc {
-    let nonce = crypto::new_nonce().expect("error generating nonce");
-    let b =
-        crypto::encrypt(s.as_bytes(), &nonce, CONFIG.enc_key.as_bytes()).expect("encryption error");
+fn encrypt(s: &str) -> Result<Enc> {
+    let nonce = crypto::new_nonce().map_err(|_| "error generating nonce")?;
+    let b = crypto::encrypt(s.as_bytes(), &nonce, CONFIG.enc_key.as_bytes())
+        .map_err(|_| "encryption error")?;
     let value = hex::encode(&b);
     let nonce = hex::encode(&nonce);
-    Enc { value, nonce }
+    Ok(Enc { value, nonce })
 }
 
-fn decrypt(enc: &Enc) -> String {
-    let nonce = hex::decode(&enc.nonce).expect("nonce hex decode error");
-    let mut value = hex::decode(&enc.value).expect("value hex decode error");
+fn decrypt(enc: &Enc) -> Result<String> {
+    let nonce = hex::decode(&enc.nonce).map_err(|_| "nonce hex decode error")?;
+    let mut value = hex::decode(&enc.value).map_err(|_| "value hex decode error")?;
     let bytes = crypto::decrypt(value.as_mut_slice(), &nonce, CONFIG.enc_key.as_bytes())
-        .expect("encryption error");
-    String::from_utf8(bytes.to_owned()).unwrap()
+        .map_err(|_| "encryption error")?;
+    let s = String::from_utf8(bytes.to_owned()).map_err(|_| "error decrypting bytes")?;
+    Ok(s)
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
@@ -331,21 +337,21 @@ async fn upsert_user(
     access: &Access,
     name_email: &NameEmail,
     new_auth_token: &str,
-) -> anyhow::Result<User> {
+) -> Result<User> {
     let scopes = access
         .scope
         .split_whitespace()
         .map(|s| s.to_string())
         .collect::<Vec<_>>();
-    let access_expires = spotify_expiry_seconds_to_epoch_expiration(access.expires_in - 60);
+    let access_expires = spotify_expiry_seconds_to_epoch_expiration(access.expires_in - 60)?;
 
-    let access_token = encrypt(&access.access_token);
+    let access_token = encrypt(&access.access_token)?;
     let refresh_token = encrypt(
         &access
             .refresh_token
             .as_ref()
             .expect("missing refresh token"),
-    );
+    )?;
     let auth_token = crypto::hmac_sign(new_auth_token);
     let user = sqlx::query_as!(
         User,
@@ -378,7 +384,7 @@ async fn upsert_user(
     )
     .fetch_one(pool)
     .await
-    .expect("db error");
+    .map_err(|e| format!("error upserting user {:?}", e))?;
     Ok(user)
 }
 
@@ -436,24 +442,25 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
         .build())
 }
 
-fn now_seconds() -> i64 {
-    std::time::SystemTime::now()
+fn now_seconds() -> Result<i64> {
+    Ok(std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("invalid duration")
-        .as_secs() as i64
+        .map_err(|e| format!("invalid duration {:?}", e))?
+        .as_secs() as i64)
 }
 
-fn spotify_expiry_seconds_to_epoch_expiration(expires_in: u64) -> i64 {
-    std::time::SystemTime::now()
+fn spotify_expiry_seconds_to_epoch_expiration(expires_in: u64) -> Result<i64> {
+    let now = std::time::SystemTime::now();
+    Ok(now
         .checked_add(std::time::Duration::from_secs(expires_in - 60))
-        .expect("invalid time")
+        .ok_or_else(|| format!("can't add {:?} to time {:?}", expires_in - 60, now))?
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("invalid duration")
-        .as_secs() as i64
+        .map_err(|e| format!("invalid duration {:?}", e))?
+        .as_secs() as i64)
 }
 
-async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
-    if user.access_expires > now_seconds() {
+async fn get_user_access_token(pool: &PgPool, user: &User) -> Result<String> {
+    if user.access_expires > now_seconds()? {
         return decrypt(&Enc {
             value: user.access_token.clone(),
             nonce: user.access_nonce.clone(),
@@ -464,13 +471,11 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
     let refresh_token = decrypt(&Enc {
         value: user.refresh_token.clone(),
         nonce: user.refresh_nonce.clone(),
-    });
+    })?;
 
-    let access = refresh_access_token(&refresh_token)
-        .await
-        .expect("refresh token failure");
-    let enc_access = encrypt(&access.access_token);
-    let access_expires = spotify_expiry_seconds_to_epoch_expiration(access.expires_in - 60);
+    let access = refresh_access_token(&refresh_token).await?;
+    let enc_access = encrypt(&access.access_token)?;
+    let access_expires = spotify_expiry_seconds_to_epoch_expiration(access.expires_in - 60)?;
     sqlx::query_as!(
         User,
         "
@@ -485,7 +490,7 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
     .await
     .expect("db error");
 
-    access.access_token
+    Ok(access.access_token)
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
@@ -520,33 +525,39 @@ struct NewPlay {
     modified: chrono::DateTime<chrono::Utc>,
 }
 
-async fn get_history(pool: &PgPool, user: &User) -> serde_json::Value {
-    let access_token = get_user_access_token(pool, user).await;
+async fn get_history(pool: &PgPool, user: &User) -> Result<serde_json::Value> {
+    let access_token = get_user_access_token(pool, user).await?;
     let mut resp = surf::get(format!(
         "https://api.spotify.com/v1/me/player/recently-played?limit=50",
     ))
     .header("authorization", format!("Bearer {}", access_token))
     .send()
     .await
-    .expect("get history error");
-    let resp: serde_json::Value = resp.body_json().await.expect("json error");
-    resp
+    .map_err(|e| format!("get history error {:?}", e))?;
+    let resp: serde_json::Value = resp
+        .body_json()
+        .await
+        .map_err(|e| format!("get history json error {:?}", e))?;
+    Ok(resp)
 }
 
-async fn get_currently_playing(pool: &PgPool, user: &User) -> Option<serde_json::Value> {
-    let access_token = get_user_access_token(pool, user).await;
+async fn get_currently_playing(pool: &PgPool, user: &User) -> Result<Option<serde_json::Value>> {
+    let access_token = get_user_access_token(pool, user).await?;
     let mut resp = surf::get(format!(
         "https://api.spotify.com/v1/me/player/currently-playing",
     ))
     .header("authorization", format!("Bearer {}", access_token))
     .send()
     .await
-    .expect("get currently playing error");
+    .map_err(|e| format!("get currently playing error {:?}", e))?;
     if resp.status() == StatusCode::NoContent {
-        return None;
+        return Ok(None);
     }
-    let resp: serde_json::Value = resp.body_json().await.expect("json error");
-    Some(resp)
+    let resp: serde_json::Value = resp
+        .body_json()
+        .await
+        .map_err(|e| format!("get currently playing json error {:?}", e))?;
+    Ok(Some(resp))
 }
 
 async fn recent(req: tide::Request<Context>) -> tide::Result {
@@ -602,119 +613,156 @@ async fn get_auth_user(req: &tide::Request<Context>) -> Option<User> {
     }
 }
 
+async fn _recently_played_user(pool: &PgPool, user: &User) -> Result<()> {
+    let mut new_plays = vec![];
+    let recent = get_history(pool, user).await?;
+    for item in recent["items"]
+        .as_array()
+        .ok_or_else(|| format!("items: unexpected shape {:?}", recent))?
+    {
+        // played_at is the "play end" time so we have to subtract the
+        // track duration to get the probable "start time"
+        let played_at = item["played_at"]
+            .as_str()
+            .ok_or_else(|| format!("played_at: unexpected shape {:?}", item))?
+            .parse::<chrono::DateTime<chrono::Utc>>()
+            .map_err(|e| format!("invalid datetime {:?}", e))?;
+        let duration_ms = chrono::Duration::milliseconds(
+            item["track"]["duration_ms"]
+                .as_i64()
+                .ok_or_else(|| format!("duration: unexpected shape {:?}", item))?,
+        );
+        let played_at = played_at - duration_ms;
+        let played_at_minute = truncate_to_minute(played_at)?;
+        let spotify_id = item["track"]["id"]
+            .as_str()
+            .ok_or_else(|| format!("spotify_id: unexpected shape {:?}", item))?;
+        let name = item["track"]["name"]
+            .as_str()
+            .ok_or_else(|| format!("track name: unexpected shape {:?}", item))?;
+        let mut artist_names = vec![];
+        for artist in item["track"]["artists"]
+            .as_array()
+            .ok_or_else(|| format!("track artists: unexpected shape {:?}", item))?
+        {
+            artist_names.push(
+                artist["name"]
+                    .as_str()
+                    .ok_or_else(|| format!("artist name: unexpected shape {:?}", artist))?
+                    .to_string(),
+            );
+        }
+        let probably_exists = sqlx::query_scalar!(
+            "
+            select count(*) from spot.plays
+            where user_id = $1 and spotify_id = $2 and
+                  tstzrange(
+                     spot.plays.played_at_minute - interval '1 min',
+                     spot.plays.played_at_minute + interval '1 min',
+                     '[]'
+                  ) &&
+                  tstzrange(
+                     $3::timestamptz - interval '1 min',
+                     $3::timestamptz + interval '1 min',
+                     '[]'
+                  )
+            ",
+            &user.id,
+            spotify_id,
+            played_at_minute,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("failed to count plays in time range {:?}", e))?
+        .ok_or_else(|| "no count returned from count-plays-in-range query")?;
+        if probably_exists == 0 {
+            sqlx::query!(
+                "
+                insert into spot.tracks
+                (spotify_id, name, artist_names, raw)
+                values
+                ($1, $2, $3, $4)
+                on conflict (spotify_id) do update set
+                name = excluded.name, artist_names = excluded.artist_names,
+                raw = excluded.raw, modified = now()
+                ",
+                spotify_id,
+                name,
+                artist_names.as_slice(),
+                item
+            )
+            .execute(pool)
+            .await
+            .map_err(|e| format!("failed to upsert track {:?}", e))?;
+            let new_play = sqlx::query_as!(
+                NewPlay,
+                "
+                insert into spot.plays
+                (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
+                values
+                ($1, $2, $3, $4, $5, $6)
+                on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
+                returning id, created, modified
+                ",
+                &user.id,
+                spotify_id,
+                played_at,
+                played_at_minute,
+                name,
+                artist_names.as_slice(),
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| format!("failed to insert play {:?}", e))?;
+            if new_play.created == new_play.modified {
+                new_plays.push(new_play.id);
+            }
+        }
+    }
+    if !new_plays.is_empty() {
+        slog::info!(LOG, "inserted new plays {:?}", new_plays);
+    }
+    Ok(())
+}
+
+async fn _background_recently_played_poll_inner(pool: &PgPool) -> Result<()> {
+    let users = sqlx::query_as!(User, "select * from spot.users")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("error getting users {:?}", e))?;
+    slog::info!(
+        LOG,
+        "recently played poll users {:?}",
+        users
+            .iter()
+            .map(|u| u.email.as_str())
+            .collect::<Vec<&str>>()
+    );
+    for user in &users {
+        if let Err(e) = _recently_played_user(pool, user).await {
+            slog::error!(
+                LOG,
+                "error polling recently played for user {:?} {:?}",
+                user,
+                e
+            );
+        }
+    }
+    Ok(())
+}
+
 async fn background_recently_played_poll(pool: PgPool) {
     async_std::task::sleep(std::time::Duration::from_secs(
         CONFIG.poll_interval_seconds * 2,
     ))
     .await;
     loop {
-        let users = sqlx::query_as!(User, "select * from spot.users")
-            .fetch_all(&pool)
-            .await
-            .expect("error getting users");
-        slog::info!(
-            LOG,
-            "recently played poll users {:?}",
-            users
-                .iter()
-                .map(|u| u.email.as_str())
-                .collect::<Vec<&str>>()
-        );
-        for user in &users {
-            let mut new_plays = vec![];
-            let recent = get_history(&pool, user).await;
-            for item in recent["items"].as_array().unwrap() {
-                // played_at is the "play end" time so we have to subtract the
-                // track duration to get the probable "start time"
-                let played_at = item["played_at"]
-                    .as_str()
-                    .unwrap()
-                    .parse::<chrono::DateTime<chrono::Utc>>()
-                    .unwrap();
-                let duration_ms =
-                    chrono::Duration::milliseconds(item["track"]["duration_ms"].as_i64().unwrap());
-                let played_at = played_at - duration_ms;
-                let played_at_minute = played_at
-                    .with_nanosecond(0)
-                    .unwrap()
-                    .with_second(0)
-                    .unwrap();
-                let spotify_id = item["track"]["id"].as_str().unwrap();
-                let name = item["track"]["name"].as_str().unwrap();
-                let mut artist_names = vec![];
-                for artist in item["track"]["artists"].as_array().unwrap() {
-                    artist_names.push(artist["name"].as_str().unwrap().to_string());
-                }
-                let probably_exists = sqlx::query_scalar!(
-                    "
-                    select count(*) from spot.plays
-                    where user_id = $1 and spotify_id = $2 and
-                          tstzrange(
-                             spot.plays.played_at_minute - interval '1 min',
-                             spot.plays.played_at_minute + interval '1 min',
-                             '[]'
-                          ) &&
-                          tstzrange(
-                             $3::timestamptz - interval '1 min',
-                             $3::timestamptz + interval '1 min',
-                             '[]'
-                          )
-                    ",
-                    &user.id,
-                    spotify_id,
-                    played_at_minute,
-                )
-                .fetch_one(&pool)
-                .await
-                .expect("failed to count plays in time range")
-                .unwrap();
-                if probably_exists == 0 {
-                    sqlx::query!(
-                        "
-                        insert into spot.tracks
-                        (spotify_id, name, artist_names, raw)
-                        values
-                        ($1, $2, $3, $4)
-                        on conflict (spotify_id) do update set
-                        name = excluded.name, artist_names = excluded.artist_names,
-                        raw = excluded.raw, modified = now()
-                        ",
-                        spotify_id,
-                        name,
-                        artist_names.as_slice(),
-                        item
-                    )
-                    .execute(&pool)
-                    .await
-                    .expect("failed to upsert track");
-                    let new_play = sqlx::query_as!(
-                        NewPlay,
-                        "
-                        insert into spot.plays
-                        (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
-                        values
-                        ($1, $2, $3, $4, $5, $6)
-                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
-                        returning id, created, modified
-                        ",
-                        &user.id,
-                        spotify_id,
-                        played_at,
-                        played_at_minute,
-                        name,
-                        artist_names.as_slice(),
-                    )
-                        .fetch_one(&pool)
-                        .await
-                        .expect("failed to insert play");
-                    if new_play.created == new_play.modified {
-                        new_plays.push(new_play.id);
-                    }
-                }
-            }
-            if !new_plays.is_empty() {
-                slog::info!(LOG, "inserted new plays {:?}", new_plays);
-            }
+        if let Err(e) = _background_recently_played_poll_inner(&pool).await {
+            slog::error!(
+                LOG,
+                "error while running background recently played poll {:?}",
+                e
+            );
         }
         async_std::task::sleep(std::time::Duration::from_secs(
             CONFIG.poll_interval_seconds * 10,
@@ -723,110 +771,171 @@ async fn background_recently_played_poll(pool: PgPool) {
     }
 }
 
+fn truncate_to_minute(dt: DateTime<Utc>) -> Result<DateTime<Utc>> {
+    Ok(dt
+        .with_nanosecond(0)
+        .ok_or_else(|| format!("error setting nanoseconds to zero: {:?}", dt))?
+        .with_second(0)
+        .ok_or_else(|| format!("error setting seconds to zero: {:?}", dt))?)
+}
+
+async fn _currently_playing_user(pool: &PgPool, user: &User) -> Result<()> {
+    let current = get_currently_playing(pool, user).await?;
+    if let Some(current) = current {
+        // Non "track" things like podcasts, return a null item (track)
+        // ignore these for now. They also don't appear to come back at all
+        // from the recently-played API, but it's not mentioned in their
+        // documentation whether that's intentional or not.
+        if current["item"].is_null() {
+            slog::debug!(
+                LOG,
+                "currently playing for user {:?} is not a track",
+                user.id
+            );
+            return Ok(());
+        }
+
+        // timestamp is the "play start" time. This value seems like
+        // it gets updated whenever you pause or unpause the current track
+        // which means we need to dedupe against the current latest in
+        // our db so we don't keep inserting plays when you pause/unpause.
+        let start_millis = current["timestamp"].as_i64().ok_or_else(|| {
+            format!(
+                "currently playing timestamp: unexpected shape {:?}",
+                current
+            )
+        })?;
+        let played_at = chrono::Utc.timestamp_millis(start_millis);
+        let played_at_minute = truncate_to_minute(played_at)?;
+        let spotify_id = current["item"]["id"].as_str().ok_or_else(|| {
+            format!(
+                "currently playing spotify_id: unexpected shape {:?}",
+                current
+            )
+        })?;
+        let name = current["item"]["name"]
+            .as_str()
+            .ok_or_else(|| format!("currently playing name: unexpected shape {:?}", current))?;
+        let mut artist_names = vec![];
+        for artist in current["item"]["artists"]
+            .as_array()
+            .ok_or_else(|| format!("currently playing artists: unexpected shape {:?}", current))?
+        {
+            artist_names.push(
+                artist["name"]
+                    .as_str()
+                    .ok_or_else(|| {
+                        format!(
+                            "currently playing artist name: unexpected shape {:?}",
+                            artist
+                        )
+                    })?
+                    .to_string(),
+            );
+        }
+        let latest = sqlx::query_as!(
+            Play,
+            "
+            select * from spot.plays where user_id = $1
+            order by played_at desc
+            limit 1
+            ",
+            &user.id,
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("failed fetching optional latest play {:?}", e))?;
+        if latest.is_some() && latest.unwrap().spotify_id == spotify_id {
+            slog::debug!(
+                LOG,
+                "{} currently listening to {} (no change)",
+                &user.email,
+                name
+            );
+        } else {
+            sqlx::query!(
+                "
+                insert into spot.tracks
+                (spotify_id, name, artist_names, raw)
+                values
+                ($1, $2, $3, $4)
+                on conflict (spotify_id) do update set
+                name = excluded.name, artist_names = excluded.artist_names,
+                raw = excluded.raw, modified = now()
+                ",
+                spotify_id,
+                name,
+                artist_names.as_slice(),
+                current
+            )
+            .execute(pool)
+            .await
+            .map_err(|e| format!("failed to upsert track {:?}", e))?;
+            let new_play = sqlx::query_as!(
+                NewPlay,
+                "
+                insert into spot.plays
+                (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
+                values
+                ($1, $2, $3, $4, $5, $6)
+                on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
+                returning id, created, modified
+                ",
+                &user.id,
+                spotify_id,
+                played_at,
+                played_at_minute,
+                name,
+                artist_names.as_slice(),
+            )
+            .fetch_one(pool)
+            .await
+            .map_err(|e| format!("failed to insert play for user {:?} {:?}", user.id, e))?;
+            if new_play.created == new_play.modified {
+                slog::info!(LOG, "{} new current song {}", &user.email, name);
+            } else {
+                slog::info!(LOG, "{} currently listening to {}", &user.email, name);
+            }
+        }
+    };
+    Ok(())
+}
+
+async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
+    let users = sqlx::query_as!(User, "select * from spot.users")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("error getting users for poll {:?}", e))?;
+    slog::info!(
+        LOG,
+        "currently playing poll users {:?}",
+        users
+            .iter()
+            .map(|u| u.email.as_str())
+            .collect::<Vec<&str>>()
+    );
+    for user in &users {
+        if let Err(e) = _currently_playing_user(pool, user).await {
+            slog::error!(
+                LOG,
+                "error polling currently playing for user {:?} {:?}",
+                user,
+                e
+            );
+        }
+    }
+    Ok(())
+}
+
 async fn background_currently_playing_poll(pool: PgPool) {
     loop {
         async_std::task::sleep(std::time::Duration::from_secs(CONFIG.poll_interval_seconds)).await;
-        let users = sqlx::query_as!(User, "select * from spot.users")
-            .fetch_all(&pool)
-            .await
-            .expect("error getting users");
-        slog::info!(
-            LOG,
-            "currently playing poll users {:?}",
-            users
-                .iter()
-                .map(|u| u.email.as_str())
-                .collect::<Vec<&str>>()
-        );
-        for user in &users {
-            if let Some(current) = get_currently_playing(&pool, user).await {
-                // Non "track" things like podcasts, return a null item (track)
-                // ignore these for now. They also don't appear to come back at all
-                // from the recently-played API, but it's not mentioned in their
-                // documentation whether that's intentional or not.
-                if current["item"].is_null() {
-                    continue;
-                }
-                // timestamp is that "play start" time. this value seems like
-                // it gets updated whenever you pause or unpause the current track.
-                let start_millis = current["timestamp"].as_i64().unwrap();
-                let played_at = chrono::Utc.timestamp_millis(start_millis);
-                let played_at_minute = played_at
-                    .with_nanosecond(0)
-                    .unwrap()
-                    .with_second(0)
-                    .unwrap();
-                let spotify_id = current["item"]["id"].as_str().unwrap();
-                let name = current["item"]["name"].as_str().unwrap();
-                let mut artist_names = vec![];
-                for artist in current["item"]["artists"].as_array().unwrap() {
-                    artist_names.push(artist["name"].as_str().unwrap().to_string());
-                }
-                let latest = sqlx::query_as!(
-                    Play,
-                    "
-                    select * from spot.plays where user_id = $1
-                    order by played_at desc
-                    limit 1
-                    ",
-                    &user.id,
-                )
-                .fetch_optional(&pool)
-                .await
-                .expect("failed fetching optional latest play");
-                if latest.is_some() && latest.unwrap().spotify_id == spotify_id {
-                    slog::debug!(
-                        LOG,
-                        "{} currently listening to {} (no change)",
-                        &user.email,
-                        name
-                    );
-                } else {
-                    sqlx::query!(
-                        "
-                        insert into spot.tracks
-                        (spotify_id, name, artist_names, raw)
-                        values
-                        ($1, $2, $3, $4)
-                        on conflict (spotify_id) do update set
-                        name = excluded.name, artist_names = excluded.artist_names,
-                        raw = excluded.raw, modified = now()
-                        ",
-                        spotify_id,
-                        name,
-                        artist_names.as_slice(),
-                        current
-                    )
-                    .execute(&pool)
-                    .await
-                    .expect("failed to upsert track");
-                    let new_play = sqlx::query_as!(
-                        NewPlay,
-                        "
-                        insert into spot.plays
-                        (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
-                        values
-                        ($1, $2, $3, $4, $5, $6)
-                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
-                        returning id, created, modified
-                        ",
-                        &user.id,
-                        spotify_id,
-                        played_at,
-                        played_at_minute,
-                        name,
-                        artist_names.as_slice(),
-                    )
-                    .fetch_one(&pool)
-                    .await
-                    .expect("failed to insert play");
-                    if new_play.created == new_play.modified {
-                        slog::info!(LOG, "{} new current song {}", &user.email, name);
-                    } else {
-                        slog::info!(LOG, "{} currently listening to {}", &user.email, name);
-                    }
-                }
-            };
+        if let Err(e) = _background_currently_playing_poll_inner(&pool).await {
+            slog::error!(
+                LOG,
+                "error while running background currently playing poll {:?}",
+                e
+            );
         }
     }
 }

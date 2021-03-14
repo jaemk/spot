@@ -1,73 +1,5 @@
 {
   "db": "PostgreSQL",
-  "1eb8a3d77f96ab80d372b9ee1c1739b16fece75266beecb0440aa63082df5f0e": {
-    "query": "\n                    select * from spot.plays where user_id = $1\n                    order by played_at desc\n                    limit 1\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "spotify_id",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "played_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "played_at_minute",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 7,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 8,
-          "name": "artist_names",
-          "type_info": "TextArray"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "20c47d3cc32e5166a055778d4f40a985f1100211afdd615897a58627095662e9": {
     "query": "select * from spot.plays where user_id = $1 order by played_at desc",
     "describe": {
@@ -225,6 +157,96 @@
       ]
     }
   },
+  "379b474cc9977f97dd8726afd9d0e9582362e6cbf8aa60e16613c23b72afd9af": {
+    "query": "\n            select * from spot.plays where user_id = $1\n            order by played_at desc\n            limit 1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "spotify_id",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "played_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "played_at_minute",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 7,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "artist_names",
+          "type_info": "TextArray"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "463075bcbf94f44e80a7c13a4d39cdf0019547c0e2af37e321a4437eed080829": {
+    "query": "\n            select count(*) from spot.plays\n            where user_id = $1 and spotify_id = $2 and\n                  tstzrange(\n                     spot.plays.played_at_minute - interval '1 min',\n                     spot.plays.played_at_minute + interval '1 min',\n                     '[]'\n                  ) &&\n                  tstzrange(\n                     $3::timestamptz - interval '1 min',\n                     $3::timestamptz + interval '1 min',\n                     '[]'\n                  )\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
   "5710e37dc915a2b2601918208f4aa227020581cc1f0e0d578c770d12c8b844af": {
     "query": "select * from spot.users",
     "describe": {
@@ -309,40 +331,40 @@
       ]
     }
   },
-  "7e11ac52dd4bd3aa2c1082cf3475874ec539e6ccad2daa35ca2f834b906bec42": {
-    "query": "\n                        insert into spot.tracks\n                        (spotify_id, name, artist_names, raw)\n                        values\n                        ($1, $2, $3, $4)\n                        on conflict (spotify_id) do update set\n                        name = excluded.name, artist_names = excluded.artist_names,\n                        raw = excluded.raw, modified = now()\n                        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "TextArray",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "8c936682b7223c3c053902eb4284df657dbd020f032c0d219453deb79b86315f": {
-    "query": "\n                    select count(*) from spot.plays\n                    where user_id = $1 and spotify_id = $2 and\n                          tstzrange(\n                             spot.plays.played_at_minute - interval '1 min',\n                             spot.plays.played_at_minute + interval '1 min',\n                             '[]'\n                          ) &&\n                          tstzrange(\n                             $3::timestamptz - interval '1 min',\n                             $3::timestamptz + interval '1 min',\n                             '[]'\n                          )\n                    ",
+  "66d153501ce8b3b5249e7a25bab8f7468c67ae855356d1fbeced65b4aa24414f": {
+    "query": "\n                insert into spot.plays\n                (user_id, spotify_id, played_at, played_at_minute, name, artist_names)\n                values\n                ($1, $2, $3, $4, $5, $6)\n                on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                returning id, created, modified\n                ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "count",
+          "name": "id",
           "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "modified",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
         "Left": [
           "Int8",
           "Text",
-          "Timestamptz"
+          "Timestamptz",
+          "Timestamptz",
+          "Text",
+          "TextArray"
         ]
       },
       "nullable": [
-        null
+        false,
+        false,
+        false
       ]
     }
   },
@@ -440,6 +462,21 @@
       ]
     }
   },
+  "c24f7d56942a933468dc83fd1df8f38567518fa5f27c08db0df0366554f716d1": {
+    "query": "\n                insert into spot.tracks\n                (spotify_id, name, artist_names, raw)\n                values\n                ($1, $2, $3, $4)\n                on conflict (spotify_id) do update set\n                name = excluded.name, artist_names = excluded.artist_names,\n                raw = excluded.raw, modified = now()\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "TextArray",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "cf04d9f3cfa393af6552186b0a36c52b1b87f95ec6a0036a8ff7b24d6f8b2bd6": {
     "query": "select * from spot.users where auth_token = $1",
     "describe": {
@@ -520,43 +557,6 @@
         false,
         false,
         false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "dc73aabf93d4eaa24d75decf2f407f207eabfce7253b978353d65fff38a466f4": {
-    "query": "\n                        insert into spot.plays\n                        (user_id, spotify_id, played_at, played_at_minute, name, artist_names)\n                        values\n                        ($1, $2, $3, $4, $5, $6)\n                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                        returning id, created, modified\n                        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text",
-          "Timestamptz",
-          "Timestamptz",
-          "Text",
-          "TextArray"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false
