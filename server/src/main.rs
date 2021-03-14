@@ -109,9 +109,11 @@ impl Config {
         let p = if self.ssl { "https" } else { "http" };
         format!("{}://{}:{}", p, self.host, self.port)
     }
+    pub fn redirect_host(&self) -> String {
+        self.real_hostname.clone().unwrap_or_else(|| self.host())
+    }
     pub fn spotify_redirect_url(&self) -> String {
-        let host = self.real_hostname.clone().unwrap_or_else(|| self.host());
-        format!("{}/auth", host)
+        format!("{}/auth", self.redirect_host())
     }
     pub fn domain(&self) -> String {
         self.host.clone()
@@ -411,7 +413,7 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
         if !redirect.contains("login") {
             slog::info!(LOG, "found login redirect {:?}", redirect);
             let mut resp: tide::Response =
-                tide::Redirect::new(format!("{}{}", CONFIG.host(), redirect)).into();
+                tide::Redirect::new(format!("{}{}", CONFIG.redirect_host(), redirect)).into();
             resp.insert_header("set-cookie", cookie_str);
             return Ok(resp);
         }
@@ -533,9 +535,12 @@ async fn recent(req: tide::Request<Context>) -> tide::Result {
     let user = get_auth_user(&req).await;
     if user.is_none() {
         let path = req.url().path();
-        return Ok(
-            tide::Redirect::new(format!("{}/login?redirect={}", CONFIG.host(), path)).into(),
-        );
+        return Ok(tide::Redirect::new(format!(
+            "{}/login?redirect={}",
+            CONFIG.redirect_host(),
+            path
+        ))
+        .into());
     }
     let user = user.unwrap();
     let ctx = req.state();
@@ -759,7 +764,8 @@ async fn background_currently_playing_poll(pool: PgPool) {
 
 async fn index(_req: tide::Request<Context>) -> tide::Result {
     slog::info!(LOG, "index redirecting to /recent");
-    let resp: tide::Response = tide::Redirect::new(format!("{}/recent", CONFIG.host())).into();
+    let resp: tide::Response =
+        tide::Redirect::new(format!("{}/recent", CONFIG.redirect_host())).into();
     return Ok(resp);
 }
 
