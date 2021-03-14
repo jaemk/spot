@@ -576,16 +576,115 @@ async fn get_auth_user(req: &tide::Request<Context>) -> Option<User> {
     }
 }
 
-async fn background_poll(pool: PgPool) {
+async fn background_recently_played_poll(pool: PgPool) {
+    async_std::task::sleep(std::time::Duration::from_secs(
+        CONFIG.poll_interval_seconds * 2,
+    ))
+    .await;
     loop {
-        async_std::task::sleep(std::time::Duration::from_secs(CONFIG.poll_interval_seconds)).await;
-        let users = sqlx::query_as!(User, "select * from spot.users",)
+        let users = sqlx::query_as!(User, "select * from spot.users")
             .fetch_all(&pool)
             .await
             .expect("error getting users");
         slog::info!(
             LOG,
-            "poll users {:?}",
+            "recently played poll users {:?}",
+            users
+                .iter()
+                .map(|u| u.email.as_str())
+                .collect::<Vec<&str>>()
+        );
+        for user in &users {
+            let mut new_plays = vec![];
+            let recent = get_history(&pool, user).await;
+            for item in recent["items"].as_array().unwrap() {
+                // played_at is the "play end" time so we have to subtract the
+                // track duration to get the probable "start time"
+                let played_at = item["played_at"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<chrono::DateTime<chrono::Utc>>()
+                    .unwrap();
+                let duration_ms =
+                    chrono::Duration::milliseconds(item["track"]["duration_ms"].as_i64().unwrap());
+                let played_at = played_at - duration_ms;
+                let played_at_minute = played_at
+                    .with_nanosecond(0)
+                    .unwrap()
+                    .with_second(0)
+                    .unwrap();
+                let spotify_id = item["track"]["id"].as_str().unwrap();
+                let name = item["track"]["name"].as_str().unwrap();
+                let probably_exists = sqlx::query_scalar!(
+                    "
+                    select count(*) from spot.plays
+                    where user_id = $1 and spotify_id = $2 and
+                          tstzrange(
+                             spot.plays.played_at_minute - interval '1 min',
+                             spot.plays.played_at_minute + interval '1 min',
+                             '[]'
+                          ) &&
+                          tstzrange(
+                             $3::timestamptz - interval '1 min',
+                             $3::timestamptz + interval '1 min',
+                             '[]'
+                          )
+                    ",
+                    &user.id,
+                    spotify_id,
+                    played_at_minute,
+                )
+                .fetch_one(&pool)
+                .await
+                .expect("failed to count plays in time range")
+                .unwrap();
+                if probably_exists == 0 {
+                    let new_play = sqlx::query_as!(
+                        NewPlay,
+                        "
+                        insert into spot.plays
+                        (user_id, spotify_id, played_at, played_at_minute, name, raw)
+                        values
+                        ($1, $2, $3, $4, $5, $6)
+                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
+                        returning id, created, modified
+                        ",
+                        &user.id,
+                        spotify_id,
+                        played_at,
+                        played_at_minute,
+                        name,
+                        item,
+                    )
+                        .fetch_one(&pool)
+                        .await
+                        .expect("failed to insert play");
+                    if new_play.created == new_play.modified {
+                        new_plays.push(new_play.id);
+                    }
+                }
+            }
+            if !new_plays.is_empty() {
+                slog::info!(LOG, "inserted new plays {:?}", new_plays);
+            }
+        }
+        async_std::task::sleep(std::time::Duration::from_secs(
+            CONFIG.poll_interval_seconds * 10,
+        ))
+        .await;
+    }
+}
+
+async fn background_currently_playing_poll(pool: PgPool) {
+    loop {
+        async_std::task::sleep(std::time::Duration::from_secs(CONFIG.poll_interval_seconds)).await;
+        let users = sqlx::query_as!(User, "select * from spot.users")
+            .fetch_all(&pool)
+            .await
+            .expect("error getting users");
+        slog::info!(
+            LOG,
+            "currently playing poll users {:?}",
             users
                 .iter()
                 .map(|u| u.email.as_str())
@@ -651,78 +750,6 @@ async fn background_poll(pool: PgPool) {
                     }
                 }
             };
-            let mut new_plays = vec![];
-            let recent = get_history(&pool, user).await;
-            for item in recent["items"].as_array().unwrap() {
-                // played_at is the "play end" time so we have to subtract the
-                // track duration to get the probable "start time"
-                let played_at = item["played_at"]
-                    .as_str()
-                    .unwrap()
-                    .parse::<chrono::DateTime<chrono::Utc>>()
-                    .unwrap();
-                let duration_ms =
-                    chrono::Duration::milliseconds(item["track"]["duration_ms"].as_i64().unwrap());
-                let played_at = played_at - duration_ms;
-                let played_at_minute = played_at
-                    .with_nanosecond(0)
-                    .unwrap()
-                    .with_second(0)
-                    .unwrap();
-                let spotify_id = item["track"]["id"].as_str().unwrap();
-                let name = item["track"]["name"].as_str().unwrap();
-                let probably_exists = sqlx::query_scalar!(
-                    "
-                    select count(*) from spot.plays
-                    where user_id = $1 and spotify_id = $2 and
-                          tstzrange(
-                             spot.plays.played_at_minute - interval '1 min',
-                             spot.plays.played_at_minute + interval '1 min',
-                             '[]'
-                          ) &&
-                          tstzrange(
-                             $3::timestamptz - interval '1 min',
-                             $3::timestamptz + interval '1 min',
-                             '[]'
-                          )
-                    ",
-                    &user.id,
-                    spotify_id,
-                    played_at_minute,
-                )
-                .fetch_one(&pool)
-                .await
-                .expect("failed to count plays in time range")
-                .unwrap();
-                if probably_exists == 0 {
-                    let new_play = sqlx::query_as!(
-                        NewPlay,
-                        "
-                        insert into spot.plays
-                        (user_id, spotify_id, played_at, played_at_minute, name, raw)
-                        values
-                        ($1, $2, $3, $4, $5, $6)
-                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
-                        returning id, created, modified
-                        ",
-                        &user.id,
-                        spotify_id,
-                        played_at,
-                        played_at_minute,
-                        name,
-                        item,
-                    )
-                    .fetch_one(&pool)
-                    .await
-                    .expect("failed to insert play");
-                    if new_play.created == new_play.modified {
-                        new_plays.push(new_play.id);
-                    }
-                }
-            }
-            if !new_plays.is_empty() {
-                slog::info!(LOG, "inserted new plays {:?}", new_plays);
-            }
         }
     }
 }
@@ -746,7 +773,8 @@ async fn main() -> tide::Result<()> {
         .max_connections(5)
         .connect(&CONFIG.db_url)
         .await?;
-    async_std::task::spawn(background_poll(pool.clone()));
+    async_std::task::spawn(background_currently_playing_poll(pool.clone()));
+    async_std::task::spawn(background_recently_played_poll(pool.clone()));
     let ctx = Context { pool };
     let mut app = tide::with_state(ctx);
     app.at("/").get(index);
