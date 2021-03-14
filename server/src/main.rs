@@ -110,7 +110,7 @@ impl Config {
         format!("{}://{}:{}", p, self.host, self.port)
     }
     pub fn spotify_redirect_url(&self) -> String {
-        let host = self.real_hostname.unwrap_or_else(|| self.host());
+        let host = self.real_hostname.clone().unwrap_or_else(|| self.host());
         format!("{}/auth", host)
     }
     pub fn domain(&self) -> String {
