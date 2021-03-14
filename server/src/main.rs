@@ -55,6 +55,7 @@ pub struct Config {
     pub ssl: bool,
     pub host: String,
     pub real_hostname: Option<String>,
+    pub real_domain: Option<String>,
     pub port: u16,
     pub log_format: String,
     pub log_level: String,
@@ -78,6 +79,7 @@ impl Config {
             ssl: env_or("SSL", "false") == "true",
             host: env_or("HOST", "localhost"),
             real_hostname: env::var("REAL_HOSTNAME").ok(),
+            real_domain: env::var("REAL_DOMAIN").ok(),
             port: env_or("PORT", "3030").parse().expect("invalid port"),
             log_format: env_or("LOG_FORMAT", "json")
                 .to_lowercase()
@@ -99,6 +101,8 @@ impl Config {
             "version" => &CONFIG.version,
             "ssl" => &CONFIG.ssl,
             "host" => &CONFIG.host,
+            "real_hostname" => &CONFIG.real_hostname,
+            "real_domain" => &CONFIG.real_domain,
             "port" => &CONFIG.port,
             "log_format" => &CONFIG.log_format,
             "log_level" => &CONFIG.log_level,
@@ -116,7 +120,7 @@ impl Config {
         format!("{}/auth", self.redirect_host())
     }
     pub fn domain(&self) -> String {
-        self.host.clone()
+        self.real_domain.clone().unwrap_or_else(|| self.host.clone())
     }
 }
 
