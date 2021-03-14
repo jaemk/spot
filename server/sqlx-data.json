@@ -36,18 +36,18 @@
         },
         {
           "ordinal": 6,
-          "name": "raw",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 7,
           "name": "created",
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 8,
+          "ordinal": 7,
           "name": "modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "artist_names",
+          "type_info": "TextArray"
         }
       ],
       "parameters": {
@@ -104,18 +104,18 @@
         },
         {
           "ordinal": 6,
-          "name": "raw",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 7,
           "name": "created",
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 8,
+          "ordinal": 7,
           "name": "modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "artist_names",
+          "type_info": "TextArray"
         }
       ],
       "parameters": {
@@ -225,43 +225,6 @@
       ]
     }
   },
-  "3a6b208fdd9d976dcc5966f37a40074098ba24ff5b637f5699c3f6d210cc7e89": {
-    "query": "\n                        insert into spot.plays\n                        (user_id, spotify_id, played_at, played_at_minute, name, raw)\n                        values\n                        ($1, $2, $3, $4, $5, $6)\n                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                        returning id, created, modified\n                        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 2,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text",
-          "Timestamptz",
-          "Timestamptz",
-          "Text",
-          "Jsonb"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "5710e37dc915a2b2601918208f4aa227020581cc1f0e0d578c770d12c8b844af": {
     "query": "select * from spot.users",
     "describe": {
@@ -344,6 +307,21 @@
         false,
         false
       ]
+    }
+  },
+  "7e11ac52dd4bd3aa2c1082cf3475874ec539e6ccad2daa35ca2f834b906bec42": {
+    "query": "\n                        insert into spot.tracks\n                        (spotify_id, name, artist_names, raw)\n                        values\n                        ($1, $2, $3, $4)\n                        on conflict (spotify_id) do update set\n                        name = excluded.name, artist_names = excluded.artist_names,\n                        raw = excluded.raw, modified = now()\n                        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "TextArray",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
     }
   },
   "8c936682b7223c3c053902eb4284df657dbd020f032c0d219453deb79b86315f": {
@@ -542,6 +520,43 @@
         false,
         false,
         false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "dc73aabf93d4eaa24d75decf2f407f207eabfce7253b978353d65fff38a466f4": {
+    "query": "\n                        insert into spot.plays\n                        (user_id, spotify_id, played_at, played_at_minute, name, artist_names)\n                        values\n                        ($1, $2, $3, $4, $5, $6)\n                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                        returning id, created, modified\n                        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text",
+          "Timestamptz",
+          "Timestamptz",
+          "Text",
+          "TextArray"
+        ]
+      },
+      "nullable": [
         false,
         false,
         false

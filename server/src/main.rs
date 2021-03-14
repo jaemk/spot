@@ -120,7 +120,9 @@ impl Config {
         format!("{}/auth", self.redirect_host())
     }
     pub fn domain(&self) -> String {
-        self.real_domain.clone().unwrap_or_else(|| self.host.clone())
+        self.real_domain
+            .clone()
+            .unwrap_or_else(|| self.host.clone())
     }
 }
 
@@ -487,6 +489,18 @@ async fn get_user_access_token(pool: &PgPool, user: &User) -> String {
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
+struct Track {
+    id: i64,
+    spotify_id: String,
+    name: String,
+    artist_names: Vec<String>,
+    created: chrono::DateTime<chrono::Utc>,
+    modified: chrono::DateTime<chrono::Utc>,
+    // exists, but we don't really need it for anything right now
+    // raw: serde_json::Value,
+}
+
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
 struct Play {
     id: i64,
     user_id: i64,
@@ -494,9 +508,9 @@ struct Play {
     played_at: chrono::DateTime<chrono::Utc>,
     played_at_minute: chrono::DateTime<chrono::Utc>,
     name: String,
+    artist_names: Vec<String>,
     created: chrono::DateTime<chrono::Utc>,
     modified: chrono::DateTime<chrono::Utc>,
-    raw: serde_json::Value,
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
@@ -627,6 +641,10 @@ async fn background_recently_played_poll(pool: PgPool) {
                     .unwrap();
                 let spotify_id = item["track"]["id"].as_str().unwrap();
                 let name = item["track"]["name"].as_str().unwrap();
+                let mut artist_names = vec![];
+                for artist in item["track"]["artists"].as_array().unwrap() {
+                    artist_names.push(artist["name"].as_str().unwrap().to_string());
+                }
                 let probably_exists = sqlx::query_scalar!(
                     "
                     select count(*) from spot.plays
@@ -651,11 +669,29 @@ async fn background_recently_played_poll(pool: PgPool) {
                 .expect("failed to count plays in time range")
                 .unwrap();
                 if probably_exists == 0 {
+                    sqlx::query!(
+                        "
+                        insert into spot.tracks
+                        (spotify_id, name, artist_names, raw)
+                        values
+                        ($1, $2, $3, $4)
+                        on conflict (spotify_id) do update set
+                        name = excluded.name, artist_names = excluded.artist_names,
+                        raw = excluded.raw, modified = now()
+                        ",
+                        spotify_id,
+                        name,
+                        artist_names.as_slice(),
+                        item
+                    )
+                    .execute(&pool)
+                    .await
+                    .expect("failed to upsert track");
                     let new_play = sqlx::query_as!(
                         NewPlay,
                         "
                         insert into spot.plays
-                        (user_id, spotify_id, played_at, played_at_minute, name, raw)
+                        (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
                         values
                         ($1, $2, $3, $4, $5, $6)
                         on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
@@ -666,7 +702,7 @@ async fn background_recently_played_poll(pool: PgPool) {
                         played_at,
                         played_at_minute,
                         name,
-                        item,
+                        artist_names.as_slice(),
                     )
                         .fetch_one(&pool)
                         .await
@@ -709,7 +745,7 @@ async fn background_currently_playing_poll(pool: PgPool) {
                 // from the recently-played API, but it's not mentioned in their
                 // documentation whether that's intentional or not.
                 if current["item"].is_null() {
-                    continue
+                    continue;
                 }
                 // timestamp is that "play start" time. this value seems like
                 // it gets updated whenever you pause or unpause the current track.
@@ -722,6 +758,10 @@ async fn background_currently_playing_poll(pool: PgPool) {
                     .unwrap();
                 let spotify_id = current["item"]["id"].as_str().unwrap();
                 let name = current["item"]["name"].as_str().unwrap();
+                let mut artist_names = vec![];
+                for artist in current["item"]["artists"].as_array().unwrap() {
+                    artist_names.push(artist["name"].as_str().unwrap().to_string());
+                }
                 let latest = sqlx::query_as!(
                     Play,
                     "
@@ -742,11 +782,29 @@ async fn background_currently_playing_poll(pool: PgPool) {
                         name
                     );
                 } else {
+                    sqlx::query!(
+                        "
+                        insert into spot.tracks
+                        (spotify_id, name, artist_names, raw)
+                        values
+                        ($1, $2, $3, $4)
+                        on conflict (spotify_id) do update set
+                        name = excluded.name, artist_names = excluded.artist_names,
+                        raw = excluded.raw, modified = now()
+                        ",
+                        spotify_id,
+                        name,
+                        artist_names.as_slice(),
+                        current
+                    )
+                    .execute(&pool)
+                    .await
+                    .expect("failed to upsert track");
                     let new_play = sqlx::query_as!(
                         NewPlay,
                         "
                         insert into spot.plays
-                        (user_id, spotify_id, played_at, played_at_minute, name, raw)
+                        (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
                         values
                         ($1, $2, $3, $4, $5, $6)
                         on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
@@ -757,7 +815,7 @@ async fn background_currently_playing_poll(pool: PgPool) {
                         played_at,
                         played_at_minute,
                         name,
-                        current,
+                        artist_names.as_slice(),
                     )
                     .fetch_one(&pool)
                     .await
