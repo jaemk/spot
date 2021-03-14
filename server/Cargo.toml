@@ -17,7 +17,7 @@ slog-async = "2"
 slog-term = "2"
 slog-json = "2"
 
-sqlx = { version = "0.4", features = [ "runtime-async-std-rustls", "postgres", "macros", "migrate", "chrono", "json" ] }
+sqlx = { version = "0.5", features = [ "runtime-async-std-rustls", "postgres", "macros", "migrate", "chrono", "json" ] }
 chrono = {version = "0.4", features = ["serde"] }
 serde = "1"
 serde_json = "1"
