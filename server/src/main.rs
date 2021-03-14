@@ -704,6 +704,13 @@ async fn background_currently_playing_poll(pool: PgPool) {
         );
         for user in &users {
             if let Some(current) = get_currently_playing(&pool, user).await {
+                // Non "track" things like podcasts, return a null item (track)
+                // ignore these for now. They also don't appear to come back at all
+                // from the recently-played API, but it's not mentioned in their
+                // documentation whether that's intentional or not.
+                if current["item"].is_null() {
+                    continue
+                }
                 // timestamp is that "play start" time. this value seems like
                 // it gets updated whenever you pause or unpause the current track.
                 let start_millis = current["timestamp"].as_i64().unwrap();
