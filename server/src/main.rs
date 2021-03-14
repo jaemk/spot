@@ -767,6 +767,9 @@ struct Context {
 
 #[async_std::main]
 async fn main() -> tide::Result<()> {
+    // try sourcing a .env and server/.env if either exist
+    dotenv::dotenv().ok();
+    dotenv::from_path(std::env::current_dir().map(|p| p.join("server/.env")).unwrap()).ok();
     CONFIG.initialize()?;
 
     let pool = PgPoolOptions::new()

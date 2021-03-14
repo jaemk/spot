@@ -1916,6 +1916,7 @@ dependencies = [
  "base64 0.13.0",
  "cached",
  "chrono",
+ "dotenv",
  "hex",
  "lazy_static",
  "ring",
