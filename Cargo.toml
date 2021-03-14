@@ -1,29 +1,4 @@
-[package]
-name = "spistorfy"
-version = "0.1.0"
-authors = ["James Kominick <james@kominick.com>"]
-edition = "2018"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-surf = "2"
-tide = "0.15.0"
-async-std = { version = "1.8.0", features = ["attributes"] }
-lazy_static = "1"
-anyhow = "1"
-slog = "2"
-slog-async = "2"
-slog-term = "2"
-slog-json = "2"
-
-sqlx = { version = "0.4", features = [ "runtime-async-std-rustls", "postgres", "macros", "migrate", "chrono", "json" ] }
-chrono = {version = "0.4", features = ["serde"] }
-serde = "1"
-serde_json = "1"
-uuid = { version ="0.8", features = ["v4"] }
-cached = "0.22"
-async-mutex = "1"
-base64 = "0.13"
-hex = "0.4"
-ring = "0.16"
+[workspace]
+members = ["server"]
