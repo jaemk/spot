@@ -1,0 +1,551 @@
+{
+  "db": "PostgreSQL",
+  "1eb8a3d77f96ab80d372b9ee1c1739b16fece75266beecb0440aa63082df5f0e": {
+    "query": "\n                    select * from spot.plays where user_id = $1\n                    order by played_at desc\n                    limit 1\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "spotify_id",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "played_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "played_at_minute",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "raw",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 7,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "20c47d3cc32e5166a055778d4f40a985f1100211afdd615897a58627095662e9": {
+    "query": "select * from spot.plays where user_id = $1 order by played_at desc",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "spotify_id",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "played_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "played_at_minute",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "raw",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 7,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "21f9b6bb08cbc944d91697e04ed234345b2d548fb72814e777540b60ab038d0a": {
+    "query": "\n        update spot.users set access_token = $1, access_nonce = $2, access_expires = $3, modified = now() where id = $4 returning *\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "scopes",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 4,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "access_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "access_expires",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "auth_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 10,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 11,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Int8",
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "3a6b208fdd9d976dcc5966f37a40074098ba24ff5b637f5699c3f6d210cc7e89": {
+    "query": "\n                        insert into spot.plays\n                        (user_id, spotify_id, played_at, played_at_minute, name, raw)\n                        values\n                        ($1, $2, $3, $4, $5, $6)\n                        on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                        returning id, created, modified\n                        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text",
+          "Timestamptz",
+          "Timestamptz",
+          "Text",
+          "Jsonb"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "5710e37dc915a2b2601918208f4aa227020581cc1f0e0d578c770d12c8b844af": {
+    "query": "select * from spot.users",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "scopes",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 4,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "access_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "access_expires",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "auth_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 10,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 11,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "8c936682b7223c3c053902eb4284df657dbd020f032c0d219453deb79b86315f": {
+    "query": "\n                    select count(*) from spot.plays\n                    where user_id = $1 and spotify_id = $2 and\n                          tstzrange(\n                             spot.plays.played_at_minute - interval '1 min',\n                             spot.plays.played_at_minute + interval '1 min',\n                             '[]'\n                          ) &&\n                          tstzrange(\n                             $3::timestamptz - interval '1 min',\n                             $3::timestamptz + interval '1 min',\n                             '[]'\n                          )\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "aef42b3be2cfd675dc9e421fdac3be5e0870cd28913072e309392d83308f9b4b": {
+    "query": "\n        insert into \n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        ) \n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9) \n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes, \n        access_token = excluded.access_token, access_nonce = excluded.access_nonce, \n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce, \n        access_expires = excluded.access_expires, auth_token = excluded.auth_token, \n        modified = now()\n        returning *\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "scopes",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 4,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "access_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "access_expires",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "auth_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 10,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 11,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "TextArray",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Int8",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "cf04d9f3cfa393af6552186b0a36c52b1b87f95ec6a0036a8ff7b24d6f8b2bd6": {
+    "query": "select * from spot.users where auth_token = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "scopes",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 4,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "access_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "access_expires",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "auth_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 10,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 11,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  }
+}
