@@ -54,6 +54,7 @@ pub struct Config {
     pub version: String,
     pub ssl: bool,
     pub host: String,
+    pub real_hostname: Option<String>,
     pub port: u16,
     pub log_format: String,
     pub log_level: String,
@@ -76,6 +77,7 @@ impl Config {
             version,
             ssl: env_or("SSL", "false") == "true",
             host: env_or("HOST", "localhost"),
+            real_hostname: env::var("REAL_HOSTNAME").ok(),
             port: env_or("PORT", "3030").parse().expect("invalid port"),
             log_format: env_or("LOG_FORMAT", "json")
                 .to_lowercase()
@@ -108,7 +110,8 @@ impl Config {
         format!("{}://{}:{}", p, self.host, self.port)
     }
     pub fn spotify_redirect_url(&self) -> String {
-        format!("{}/auth", self.host())
+        let host = self.real_hostname.unwrap_or_else(|| self.host());
+        format!("{}/auth", host)
     }
     pub fn domain(&self) -> String {
         self.host.clone()
@@ -769,7 +772,12 @@ struct Context {
 async fn main() -> tide::Result<()> {
     // try sourcing a .env and server/.env if either exist
     dotenv::dotenv().ok();
-    dotenv::from_path(std::env::current_dir().map(|p| p.join("server/.env")).unwrap()).ok();
+    dotenv::from_path(
+        std::env::current_dir()
+            .map(|p| p.join("server/.env"))
+            .unwrap(),
+    )
+    .ok();
     CONFIG.initialize()?;
 
     let pool = PgPoolOptions::new()
