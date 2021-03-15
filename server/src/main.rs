@@ -947,6 +947,15 @@ async fn index(_req: tide::Request<Context>) -> tide::Result {
     return Ok(resp);
 }
 
+async fn status(_req: tide::Request<Context>) -> tide::Result {
+    Ok(tide::Response::builder(200)
+        .body(serde_json::json!({
+            "ok": "ok",
+            "version": CONFIG.version,
+        }))
+        .build())
+}
+
 #[derive(Clone)]
 struct Context {
     pool: sqlx::PgPool,
@@ -973,6 +982,7 @@ async fn main() -> tide::Result<()> {
     let ctx = Context { pool };
     let mut app = tide::with_state(ctx);
     app.at("/").get(index);
+    app.at("/status").get(status);
     app.at("/login").get(login);
     app.at("/auth").get(auth);
     app.at("/recent").get(recent);
