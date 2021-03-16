@@ -652,30 +652,44 @@ async fn _recently_played_user(pool: &PgPool, user: &User) -> Result<()> {
                     .to_string(),
             );
         }
-        let probably_exists = sqlx::query_scalar!(
+
+        // Since we're inserting a chunk of 50 recent tracks, there's the
+        // possibility that what we're trying to insert was already captured
+        // by the "currently playing" poll.
+        // Based on our estimated start-time, check if there's an existing play
+        // immediately before or after our estimated time. If there is, then
+        // we've already captured this playback, otherwise we should do an insert.
+        // Note, that our estimated start-time can be quite off from the actual
+        // start time due to pause/unpause or skipping around in the playback.
+        // This only protects against having two duplicate plays adjacent in time,
+        // but does not protect against you immediately skimming to the end of a 10m
+        // song, causing us to think the play-start-time was 10m ago and inserting
+        // a "play" that may not really make sense.
+        struct Around {
+            before: Option<String>,
+            after: Option<String>,
+        }
+        let around_time = sqlx::query_as!(
+            Around,
             "
-            select count(*) from spot.plays
-            where user_id = $1 and spotify_id = $2 and
-                  tstzrange(
-                     spot.plays.played_at_minute - interval '1 min',
-                     spot.plays.played_at_minute + interval '1 min',
-                     '[]'
-                  ) &&
-                  tstzrange(
-                     $3::timestamptz - interval '1 min',
-                     $3::timestamptz + interval '1 min',
-                     '[]'
-                  )
+            select
+                (select spotify_id from spot.plays
+                    where user_id = $1 and played_at <= $2
+                    order by played_at desc limit 1) as before,
+                (select spotify_id from spot.plays
+                    where user_id = $1 and played_at >= $2
+                    order by played_at asc limit 1) as after;
             ",
             &user.id,
-            spotify_id,
             played_at_minute,
         )
         .fetch_one(pool)
         .await
-        .map_err(|e| format!("failed to count plays in time range {:?}", e))?
-        .ok_or_else(|| "no count returned from count-plays-in-range query")?;
-        if probably_exists == 0 {
+        .map_err(|e| format!("failed to query before and after plays {:?}", e))?;
+        let some_spotify_id = Some(spotify_id.to_string());
+        let probably_exists =
+            around_time.before == some_spotify_id || around_time.after == some_spotify_id;
+        if !probably_exists {
             sqlx::query!(
                 "
                 insert into spot.tracks
