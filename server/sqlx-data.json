@@ -1,5 +1,32 @@
 {
   "db": "PostgreSQL",
+  "023f12d139293049e29dd35c2f4a29a3d645822349139d47da6677bd8df6b7c0": {
+    "query": "\n            select\n                (select spotify_id from spot.plays\n                    where user_id = $1 and played_at <= $2\n                    order by played_at desc limit 1) as before,\n                (select spotify_id from spot.plays\n                    where user_id = $1 and played_at >= $2\n                    order by played_at asc limit 1) as after;\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "before",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "after",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null,
+        null
+      ]
+    }
+  },
   "20c47d3cc32e5166a055778d4f40a985f1100211afdd615897a58627095662e9": {
     "query": "select * from spot.plays where user_id = $1 order by played_at desc",
     "describe": {
@@ -222,28 +249,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "463075bcbf94f44e80a7c13a4d39cdf0019547c0e2af37e321a4437eed080829": {
-    "query": "\n            select count(*) from spot.plays\n            where user_id = $1 and spotify_id = $2 and\n                  tstzrange(\n                     spot.plays.played_at_minute - interval '1 min',\n                     spot.plays.played_at_minute + interval '1 min',\n                     '[]'\n                  ) &&\n                  tstzrange(\n                     $3::timestamptz - interval '1 min',\n                     $3::timestamptz + interval '1 min',\n                     '[]'\n                  )\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Text",
-          "Timestamptz"
-        ]
-      },
-      "nullable": [
-        null
       ]
     }
   },
