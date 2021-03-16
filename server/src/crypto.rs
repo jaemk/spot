@@ -55,7 +55,7 @@ pub fn hash(bytes: &[u8]) -> Vec<u8> {
 ///
 /// `bytes` are encrypted using AES_256_GCM, `nonce` is expected to be
 /// 12-bytes, and `pass` 32-bytes
-pub fn encrypt<'a>(bytes: &[u8], nonce: &[u8], pass: &[u8]) -> crate::Result<Vec<u8>> {
+pub fn encrypt(bytes: &[u8], nonce: &[u8], pass: &[u8]) -> crate::Result<Vec<u8>> {
     let alg = &ring::aead::AES_256_GCM;
     let nonce = ring::aead::Nonce::try_assume_unique_for_key(nonce)
         .map_err(|_| "Encryption nonce not unique")?;

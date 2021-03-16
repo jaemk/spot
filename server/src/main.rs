@@ -527,13 +527,11 @@ struct NewPlay {
 
 async fn get_history(pool: &PgPool, user: &User) -> Result<serde_json::Value> {
     let access_token = get_user_access_token(pool, user).await?;
-    let mut resp = surf::get(format!(
-        "https://api.spotify.com/v1/me/player/recently-played?limit=50",
-    ))
-    .header("authorization", format!("Bearer {}", access_token))
-    .send()
-    .await
-    .map_err(|e| format!("get history error {:?}", e))?;
+    let mut resp = surf::get("https://api.spotify.com/v1/me/player/recently-played?limit=50")
+        .header("authorization", format!("Bearer {}", access_token))
+        .send()
+        .await
+        .map_err(|e| format!("get history error {:?}", e))?;
     let resp: serde_json::Value = resp
         .body_json()
         .await
@@ -543,13 +541,11 @@ async fn get_history(pool: &PgPool, user: &User) -> Result<serde_json::Value> {
 
 async fn get_currently_playing(pool: &PgPool, user: &User) -> Result<Option<serde_json::Value>> {
     let access_token = get_user_access_token(pool, user).await?;
-    let mut resp = surf::get(format!(
-        "https://api.spotify.com/v1/me/player/currently-playing",
-    ))
-    .header("authorization", format!("Bearer {}", access_token))
-    .send()
-    .await
-    .map_err(|e| format!("get currently playing error {:?}", e))?;
+    let mut resp = surf::get("https://api.spotify.com/v1/me/player/currently-playing")
+        .header("authorization", format!("Bearer {}", access_token))
+        .send()
+        .await
+        .map_err(|e| format!("get currently playing error {:?}", e))?;
     if resp.status() == StatusCode::NoContent {
         return Ok(None);
     }
