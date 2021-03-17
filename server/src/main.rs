@@ -412,7 +412,12 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
     let user = upsert_user(&ctx.pool, &access, &name_email, &new_auth_token)
         .await
         .expect("user upsert error");
-    slog::info!(LOG, "completing user login: {}", user.id);
+    let is_new = user.created == user.modified;
+    slog::info!(LOG, "completing user login: {}", user.id; "is_new" => is_new);
+    if is_new {
+        slog::info!(LOG, "inserting recently played for new user {}", user.id);
+        _recently_played_user(&ctx.pool, &user).await.ok();
+    }
 
     let cookie_str = format!(
         "auth_token={token}; Domain={domain}; HttpOnly; Max-Age={max_age}",
@@ -761,6 +766,7 @@ async fn _background_recently_played_poll_inner(pool: &PgPool) -> Result<()> {
     Ok(())
 }
 
+#[allow(unused)]
 async fn background_recently_played_poll(pool: PgPool) {
     async_std::task::sleep(std::time::Duration::from_secs(
         CONFIG.poll_interval_seconds * 2,
@@ -988,7 +994,6 @@ async fn main() -> tide::Result<()> {
         .connect(&CONFIG.db_url)
         .await?;
     async_std::task::spawn(background_currently_playing_poll(pool.clone()));
-    async_std::task::spawn(background_recently_played_poll(pool.clone()));
     let ctx = Context { pool };
     let mut app = tide::with_state(ctx);
     app.at("/").get(index);
