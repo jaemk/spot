@@ -27,6 +27,104 @@
       ]
     }
   },
+  "0dc023abcf9916dd3b9ac8c196b8026b4c2677a5f3ee043268d5a1f0fadfb99d": {
+    "query": "\n                select u.*\n                from spot.users u\n                    inner join spot.auth_tokens at\n                    on u.id = at.user_id\n                where hash = $1 and expires > now()\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "scopes",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 4,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "access_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "access_expires",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "auth_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 10,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 11,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "1ad83dbbba9b0e42dff46cd5c01aecdce6713718d5f116c0e8d298560a54f553": {
+    "query": "delete from spot.auth_tokens where user_id = $1 and expires <= now()",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "20c47d3cc32e5166a055778d4f40a985f1100211afdd615897a58627095662e9": {
     "query": "select * from spot.plays where user_id = $1 order by played_at desc",
     "describe": {
@@ -482,90 +580,18 @@
       "nullable": []
     }
   },
-  "cf04d9f3cfa393af6552186b0a36c52b1b87f95ec6a0036a8ff7b24d6f8b2bd6": {
-    "query": "select * from spot.users where auth_token = $1",
+  "f85f1b9ad0ea81d7c02b867d0d373fa1d97c6628b5872904f31522ee99974f13": {
+    "query": "\n        insert into\n        spot.auth_tokens (\n            hash, user_id, expires\n        )\n        values ($1, $2, $3)\n        ",
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "scopes",
-          "type_info": "TextArray"
-        },
-        {
-          "ordinal": 4,
-          "name": "access_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "access_nonce",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "refresh_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "refresh_nonce",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 8,
-          "name": "access_expires",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 9,
-          "name": "auth_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 10,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 11,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        }
-      ],
+      "columns": [],
       "parameters": {
         "Left": [
-          "Text"
+          "Text",
+          "Int8",
+          "Timestamptz"
         ]
       },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
+      "nullable": []
     }
   }
 }

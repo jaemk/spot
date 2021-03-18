@@ -1,7 +1,7 @@
 use async_mutex::Mutex;
 use cached::stores::TimedCache;
 use cached::Cached;
-use chrono::{DateTime, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 use slog::o;
 use slog::Drain;
 use sqlx::postgres::PgPoolOptions;
@@ -63,6 +63,7 @@ pub struct Config {
     pub spotify_secret_id: String,
     pub db_url: String,
     pub enc_key: String,
+    pub auth_expiration_seconds: u32,
     pub poll_interval_seconds: u64,
 }
 impl Config {
@@ -90,6 +91,10 @@ impl Config {
             spotify_secret_id: env_or("SPOTIFY_SECRET_ID", "fake"),
             db_url: env_or("DATABASE_URL", "error"),
             enc_key: env_or("ENC_KEY", "01234567890123456789012345678901"),
+            // 60 * 24 * 30
+            auth_expiration_seconds: env_or("AUTH_EXPIRATION_SECONDS", "43200")
+                .parse()
+                .expect("invalid auth_expiration_seconds"),
             poll_interval_seconds: env_or("POLL_INTERVAL_SECONDS", "10")
                 .parse()
                 .expect("invalid poll_interval_seconds"),
@@ -106,6 +111,8 @@ impl Config {
             "port" => &CONFIG.port,
             "log_format" => &CONFIG.log_format,
             "log_level" => &CONFIG.log_level,
+            "auth_expiration_seconds" => &CONFIG.auth_expiration_seconds,
+            "poll_interval_seconds" => &CONFIG.poll_interval_seconds,
         );
         Ok(())
     }
@@ -144,7 +151,7 @@ async fn new_state_token(redirect: Option<String>) -> String {
         .encode_lower(&mut uuid::Uuid::encode_buffer())
         .to_string();
     let s = serde_json::to_string(&Token { token: s, redirect }).expect("token json error");
-    let s = base64::encode(&s);
+    let s = base64::encode_config(&s, base64::URL_SAFE);
     let mut lock = STATE_KEYS.lock().await;
     lock.cache_set(s.clone(), ());
     s
@@ -165,7 +172,7 @@ async fn login(req: tide::Request<Context>) -> tide::Result {
     let token = new_state_token(maybe_redirect.redirect.clone()).await;
     slog::info!(
         LOG,
-        "redirecting to spotify auth with token {}, post-redirect-redirect {:?}",
+        "redirecting to spotify-auth with state token {}, post-redirect-redirect {:?}",
         token,
         maybe_redirect.redirect,
     );
@@ -298,11 +305,24 @@ struct User {
     // timestamp in seconds from epoch when the current
     // spotify access_token expires
     access_expires: i64,
+    created: chrono::DateTime<chrono::Utc>,
+    modified: chrono::DateTime<chrono::Utc>,
+
+    // This has been deprecated in favor of multiple tokens
+    // saved in the auth_tokens table.
+    auth_token: String,
+}
+
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
+struct AuthToken {
+    id: i64,
     // a user's (of this application) authentication token
     // that is set as cookie on a user's session. This value
     // stored is the hmac (and hex encoded) string of the
     // actual token returned to the user.
-    auth_token: String,
+    hash: String,
+    user_id: i64,
+    expires: chrono::DateTime<chrono::Utc>,
     created: chrono::DateTime<chrono::Utc>,
     modified: chrono::DateTime<chrono::Utc>,
 }
@@ -353,6 +373,10 @@ async fn upsert_user(
             .expect("missing refresh token"),
     )?;
     let auth_token = crypto::hmac_sign(new_auth_token);
+    let mut tr = pool
+        .begin()
+        .await
+        .map_err(|e| format!("error starting user transaction {:?}", e))?;
     let user = sqlx::query_as!(
         User,
         "
@@ -382,9 +406,31 @@ async fn upsert_user(
         &access_expires,
         &auth_token,
     )
-    .fetch_one(pool)
+    .fetch_one(&mut tr)
     .await
     .map_err(|e| format!("error upserting user {:?}", e))?;
+    let expires = Utc::now()
+        .checked_add_signed(Duration::seconds(CONFIG.auth_expiration_seconds as i64))
+        .ok_or("error creating expiration timestamp")?;
+    sqlx::query!(
+        "
+        insert into
+        spot.auth_tokens (
+            hash, user_id, expires
+        )
+        values ($1, $2, $3)
+        ",
+        &auth_token,
+        &user.id,
+        &expires,
+    )
+    .execute(&mut tr)
+    .await
+    .map_err(|e| format!("failed to insert user auth token {:?}", e))?;
+    tr.commit()
+        .await
+        .map_err(|e| format!("error committing user insert {:?}", e))?;
+
     Ok(user)
 }
 
@@ -413,14 +459,14 @@ async fn auth(req: tide::Request<Context>) -> tide::Result {
         .await
         .expect("user upsert error");
     let is_new = user.created == user.modified;
-    slog::info!(LOG, "completing user login: {}", user.id; "is_new" => is_new);
+    slog::info!(LOG, "completing user login: {}", user.email; "user_id" => user.id, "is_new" => is_new);
     if is_new {
-        slog::info!(LOG, "inserting recently played for new user {}", user.id);
+        slog::info!(LOG, "inserting recently played for new user {}", user.email);
         _recently_played_user(&ctx.pool, &user).await.ok();
     }
 
     let cookie_str = format!(
-        "auth_token={token}; Domain={domain}; HttpOnly; Max-Age={max_age}",
+        "auth_token={token}; Domain={domain}; Secure; HttpOnly; Max-Age={max_age}; SameSite=Lax",
         token = &new_auth_token,
         domain = &CONFIG.domain(),
         max_age = 60 * 24 * 30,
@@ -602,13 +648,34 @@ async fn get_auth_user(req: &tide::Request<Context>) -> Option<User> {
             let hash = crypto::hmac_sign(token);
             let u = sqlx::query_as!(
                 User,
-                "select * from spot.users where auth_token = $1",
-                &hash
+                "
+                select u.*
+                from spot.users u
+                    inner join spot.auth_tokens at
+                    on u.id = at.user_id
+                where hash = $1 and expires > now()
+                ",
+                &hash,
             )
             .fetch_one(&ctx.pool)
             .await
             .ok();
             slog::debug!(LOG, "current user {:?}", u);
+            if let Some(ref u) = u {
+                sqlx::query!(
+                    "delete from spot.auth_tokens where user_id = $1 and expires <= now()",
+                    &u.id
+                )
+                .execute(&ctx.pool)
+                .await
+                .map_err(|e| {
+                    format!(
+                        "error deleting expired auth tokens for user {}, continuing: {:?}",
+                        u.id, e
+                    )
+                })
+                .ok();
+            }
             u
         }
     }

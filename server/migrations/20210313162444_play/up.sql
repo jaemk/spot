@@ -1,3 +1,4 @@
+begin;
 create table spot.plays (
     id int8 primary key default spot.id_gen(),
     user_id int8 not null references spot.users(id),
