@@ -34,4 +34,14 @@ jobs:
 
       - name: lint
         run: cd server && cargo fmt -- --check && cargo clippy
+        
+      - name: deploy
+        uses: akhileshns/heroku-deploy@v3.12.12
+        if: contains(github.ref, 'master')
+        with:
+          heroku_api_key: ${{ secret.HEROKU_API_KEY }}
+          heroku_app_name: "soundlog"
+          heroku_email: "james@kominick.com"
+          usedocker: true
+
 
