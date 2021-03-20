@@ -42,16 +42,15 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('server/Cargo.lock') }}
 
       - name: lint
-        run: cd server && cargo fmt -- --check && cargo clippy
+        run: cd server && cargo fmt -- --check && cargo clippy -- --no-deps
 
       - name: deploy
         if: contains(github.ref, 'master')
-        uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
-        with:
-          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
-          heroku_app_name: "soundlog"
-          heroku_email: "james@kominick.com"
-          usedocker: true
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          heroku container:login
+          docker built -t soundlog .
+          heroku container:push soundlog
+          heroku container:release soundlog
 
