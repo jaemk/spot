@@ -10,6 +10,7 @@ fi
 if [[ -f /etc/secrets/.env ]]; then
   echo "copying /etc/secrets/.env to .env"
   cp /etc/secrets/.env .env
+  cp /etc/secrets/.env server/.env
 fi
 
 (cd server/ && migrant list)
