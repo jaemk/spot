@@ -32,7 +32,7 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      - name: lint
+      - name: cache
         uses: actions/cache@v2
         with:
           path: |
@@ -40,6 +40,8 @@ jobs:
             ~/.cargo/git
             server/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: lint
         run: cd server && cargo fmt -- --check && cargo clippy
 
       - name: deploy
