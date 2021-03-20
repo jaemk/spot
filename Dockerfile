@@ -41,6 +41,7 @@ WORKDIR /app
 
 COPY ./bin ./bin
 COPY ./server/Migrant.toml ./server/Migrant.toml
+COPY ./server/migrations ./server/migrations
 
 # copy out the binary and delete the build artifacts
 RUN cp ./server/target/release/server ./bin/server
