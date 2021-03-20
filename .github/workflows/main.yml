@@ -44,13 +44,3 @@ jobs:
       - name: lint
         run: cd server && cargo fmt -- --check && cargo clippy -- --no-deps
 
-      - name: deploy
-        if: contains(github.ref, 'master')
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: |
-          heroku container:login
-          docker built -t soundlog .
-          heroku container:push soundlog
-          heroku container:release soundlog
-
