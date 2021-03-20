@@ -43,7 +43,7 @@ lazy_static::lazy_static! {
     };
 
     // Base logger
-    pub static ref LOG: slog::Logger = BASE_LOG.new(slog::o!("app" => "spistorfy"));
+    pub static ref LOG: slog::Logger = BASE_LOG.new(slog::o!("app" => "soundlog"));
 
     // state cache
     pub static ref STATE_KEYS: Arc<Mutex<TimedCache<String, ()>>> = Arc::new(Mutex::new(TimedCache::with_lifespan(30)));

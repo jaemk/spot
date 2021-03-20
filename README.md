@@ -1,4 +1,4 @@
-# spistorfy
+# soundlog
 
 > track your spotify play history
 
