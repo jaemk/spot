@@ -28,13 +28,17 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # copy over git dir and embed latest commit hash
-WORKDIR /app
-COPY ./.git ./.git
-# make sure there's no trailing newline
-RUN git rev-parse HEAD | awk '{ printf "%s", $0 >"commit_hash.txt" }'
-RUN rm -rf ./.git
-RUN cp commit_hash.txt server/commit_hash.txt
+# WORKDIR /app
+# COPY ./.git ./.git
+# # make sure there's no trailing newline
+# RUN git rev-parse HEAD | awk '{ printf "%s", $0 >"commit_hash.txt" }'
+# RUN rm -rf ./.git
+# RUN cp commit_hash.txt server/commit_hash.txt
 
 WORKDIR /app/server
-# set the startup command to run your binary
-CMD ["./target/release/server"]
+
+# copy out the binary and delete the build artifacts
+RUN cp ./target/release/server server
+RUN rm -rf ./target
+
+CMD ["./server"]
