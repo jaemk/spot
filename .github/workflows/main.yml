@@ -45,12 +45,13 @@ jobs:
         run: cd server && cargo fmt -- --check && cargo clippy
 
       - name: deploy
-        uses: akhileshns/heroku-deploy@v3.12.12
         if: contains(github.ref, 'master')
+        uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
         with:
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_api_key: ${{secrets.HEROKU_API_KEY}}
           heroku_app_name: "soundlog"
           heroku_email: "james@kominick.com"
           usedocker: true
-
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
 
