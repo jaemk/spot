@@ -1,5 +1,5 @@
 # soundlog
 
-> track your spotify play history
+> Track your spotify play history
 
 See `server` and `web` directories
