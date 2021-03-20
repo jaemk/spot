@@ -42,6 +42,4 @@ RUN mkdir bin
 RUN cp ./server/target/release/server ./bin/server
 RUN rm -rf ./server/target
 
-COPY ./.env ./.env
-
 CMD ["./bin/server"]
