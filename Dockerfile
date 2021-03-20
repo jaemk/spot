@@ -1,5 +1,7 @@
 FROM rust:1.49
 
+RUN cargo install migrant --features postgres
+
 # create a new empty shell
 RUN mkdir -p /app
 WORKDIR /app
@@ -37,9 +39,10 @@ RUN cargo build --release
 
 WORKDIR /app
 
+COPY ./bin ./bin
+
 # copy out the binary and delete the build artifacts
-RUN mkdir bin
 RUN cp ./server/target/release/server ./bin/server
 RUN rm -rf ./server/target
 
-CMD ["./bin/server"]
+CMD ["./bin/start.sh"]
