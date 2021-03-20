@@ -35,10 +35,13 @@ RUN cargo build --release
 # RUN rm -rf ./.git
 # RUN cp commit_hash.txt server/commit_hash.txt
 
-WORKDIR /app/server
+WORKDIR /app
 
 # copy out the binary and delete the build artifacts
-RUN cp ./target/release/server server
-RUN rm -rf ./target
+RUN mkdir bin
+RUN cp ./server/target/release/server ./bin/server
+RUN rm -rf ./server/target
 
-CMD ["./server"]
+COPY ./.env ./.env
+
+CMD ["./bin/server"]
