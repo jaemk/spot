@@ -471,32 +471,6 @@
       ]
     }
   },
-  "7b8866aa51ffcb4c01e1c44eab8821c931b4d834dfefe7b7b6432790c067ec27": {
-    "query": "\n        select played_at::date, count(*)\n        from spot.plays\n        where user_id = $1\n        group by played_at::date\n        order by played_at::date desc\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "played_at",
-          "type_info": "Date"
-        },
-        {
-          "ordinal": 1,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null
-      ]
-    }
-  },
   "aef42b3be2cfd675dc9e421fdac3be5e0870cd28913072e309392d83308f9b4b": {
     "query": "\n        insert into \n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        ) \n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9) \n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes, \n        access_token = excluded.access_token, access_nonce = excluded.access_nonce, \n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce, \n        access_expires = excluded.access_expires, auth_token = excluded.auth_token, \n        modified = now()\n        returning *\n        ",
     "describe": {
@@ -588,6 +562,32 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "bf53ca8379507ca4b3d74a483f1985919cae6bdff0e4bb51f0a1310751162638": {
+    "query": "\n        select played_at::date as date, count(*)\n        from spot.plays\n        where user_id = $1\n        group by played_at::date\n        order by played_at::date desc\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "date",
+          "type_info": "Date"
+        },
+        {
+          "ordinal": 1,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        null,
+        null
       ]
     }
   },
