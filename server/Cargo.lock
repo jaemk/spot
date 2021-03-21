@@ -1916,6 +1916,7 @@ dependencies = [
  "anyhow",
  "async-mutex",
  "async-std",
+ "async-trait",
  "base64 0.13.0",
  "cached",
  "chrono",

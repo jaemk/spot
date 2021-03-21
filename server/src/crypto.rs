@@ -3,6 +3,8 @@ Crypto things
 */
 use ring::aead::BoundKey;
 
+use crate::CONFIG;
+
 /// ring requires an implementor of `NonceSequence`,
 /// which if a wrapping trait around `ring::aead::Nonce`.
 /// We have to make a wrapper that can pass ownership
@@ -55,7 +57,7 @@ pub fn hash(bytes: &[u8]) -> Vec<u8> {
 ///
 /// `bytes` are encrypted using AES_256_GCM, `nonce` is expected to be
 /// 12-bytes, and `pass` 32-bytes
-pub fn encrypt(bytes: &[u8], nonce: &[u8], pass: &[u8]) -> crate::Result<Vec<u8>> {
+pub fn encrypt_bytes(bytes: &[u8], nonce: &[u8], pass: &[u8]) -> crate::Result<Vec<u8>> {
     let alg = &ring::aead::AES_256_GCM;
     let nonce = ring::aead::Nonce::try_assume_unique_for_key(nonce)
         .map_err(|_| "Encryption nonce not unique")?;
@@ -72,7 +74,11 @@ pub fn encrypt(bytes: &[u8], nonce: &[u8], pass: &[u8]) -> crate::Result<Vec<u8>
 ///
 /// `bytes` are decrypted using AES_256_GCM, `nonce` is expected to be
 /// 12-bytes, and `pass` 32-bytes
-pub fn decrypt<'a>(bytes: &'a mut [u8], nonce: &[u8], pass: &[u8]) -> crate::Result<&'a [u8]> {
+pub fn decrypt_bytes<'a>(
+    bytes: &'a mut [u8],
+    nonce: &[u8],
+    pass: &[u8],
+) -> crate::Result<&'a [u8]> {
     let alg = &ring::aead::AES_256_GCM;
     let nonce = ring::aead::Nonce::try_assume_unique_for_key(nonce)
         .map_err(|_| "Decryption nonce not unique")?;
@@ -83,4 +89,27 @@ pub fn decrypt<'a>(bytes: &'a mut [u8], nonce: &[u8], pass: &[u8]) -> crate::Res
         .open_in_place(ring::aead::Aad::empty(), bytes)
         .map_err(|_| "Failed decrypting bytes")?;
     Ok(out_slice)
+}
+
+pub struct Enc {
+    pub value: String,
+    pub nonce: String,
+}
+
+pub fn encrypt(s: &str) -> crate::Result<Enc> {
+    let nonce = new_nonce().map_err(|_| "error generating nonce")?;
+    let b = encrypt_bytes(s.as_bytes(), &nonce, CONFIG.enc_key.as_bytes())
+        .map_err(|_| "encryption error")?;
+    let value = hex::encode(&b);
+    let nonce = hex::encode(&nonce);
+    Ok(Enc { value, nonce })
+}
+
+pub fn decrypt(enc: &Enc) -> crate::Result<String> {
+    let nonce = hex::decode(&enc.nonce).map_err(|_| "nonce hex decode error")?;
+    let mut value = hex::decode(&enc.value).map_err(|_| "value hex decode error")?;
+    let bytes = decrypt_bytes(value.as_mut_slice(), &nonce, CONFIG.enc_key.as_bytes())
+        .map_err(|_| "encryption error")?;
+    let s = String::from_utf8(bytes.to_owned()).map_err(|_| "error decrypting bytes")?;
+    Ok(s)
 }
