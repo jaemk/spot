@@ -202,7 +202,7 @@ async fn summary(req: tide::Request<Context>) -> tide::Result {
     let summary = sqlx::query_as!(
         models::PlaySummary,
         "
-        select played_at::date, count(*)
+        select played_at::date as date, count(*)
         from spot.plays
         where user_id = $1
         group by played_at::date

@@ -32,7 +32,7 @@ pub struct NewPlay {
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
 pub struct PlaySummary {
-    pub played_at: Option<chrono::NaiveDate>,
+    pub date: Option<chrono::NaiveDate>,
     pub count: Option<i64>,
 }
 
