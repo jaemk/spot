@@ -10,6 +10,7 @@ edition = "2018"
 surf = "2"
 tide = "0.15.0"
 async-std = { version = "1.8.0", features = ["attributes"] }
+async-trait = "0.1.48"
 lazy_static = "1"
 anyhow = "1"
 slog = "2"
