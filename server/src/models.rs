@@ -4,10 +4,14 @@ pub struct Track {
     pub spotify_id: String,
     pub name: String,
     pub artist_names: Vec<String>,
+    pub album_id: String,
+    pub album_name: String,
+    pub album_images: serde_json::Value,
     pub created: chrono::DateTime<chrono::Utc>,
     pub modified: chrono::DateTime<chrono::Utc>,
-    // exists, but we don't really need it for anything right now
-    // raw: serde_json::Value,
+    // exists on old records,
+    // but we don't really need it for anything right now/anymore
+    pub raw: Option<serde_json::Value>,
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
