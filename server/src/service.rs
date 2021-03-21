@@ -417,7 +417,22 @@ async fn _recently_played_user(pool: &PgPool, user: &models::User) -> Result<()>
         let name = item["track"]["name"]
             .as_str()
             .ok_or_else(|| format!("track name: unexpected shape {:?}", item))?;
+        let album_name = item["track"]["album"]["name"]
+            .as_str()
+            .ok_or_else(|| format!("currently playing album name: unexpected shape {:?}", item))?;
+        let album_id = item["track"]["album"]["id"]
+            .as_str()
+            .ok_or_else(|| format!("currently playing album name: unexpected shape {:?}", item))?;
+        let album_images = &item["track"]["album"]["images"];
+        if album_images.is_null() {
+            return Err(se!(
+                "currently playing album images: unexpected shape {:?}",
+                item
+            )
+            .into());
+        }
         let mut artist_names = vec![];
+        let mut artist_ids = vec![];
         for artist in item["track"]["artists"]
             .as_array()
             .ok_or_else(|| format!("track artists: unexpected shape {:?}", item))?
@@ -426,6 +441,12 @@ async fn _recently_played_user(pool: &PgPool, user: &models::User) -> Result<()>
                 artist["name"]
                     .as_str()
                     .ok_or_else(|| format!("artist name: unexpected shape {:?}", artist))?
+                    .to_string(),
+            );
+            artist_ids.push(
+                artist["id"]
+                    .as_str()
+                    .ok_or_else(|| format!("artist id: unexpected shape {:?}", artist))?
                     .to_string(),
             );
         }
@@ -470,17 +491,23 @@ async fn _recently_played_user(pool: &PgPool, user: &models::User) -> Result<()>
             sqlx::query!(
                 "
                 insert into spot.tracks
-                (spotify_id, name, artist_names, raw)
+                (spotify_id, name, artist_names, artist_ids, album_name, album_id, album_images)
                 values
-                ($1, $2, $3, $4)
+                ($1, $2, $3, $4, $5, $6, $7)
                 on conflict (spotify_id) do update set
                 name = excluded.name, artist_names = excluded.artist_names,
-                raw = excluded.raw, modified = now()
+                artist_ids = excluded.artist_ids,
+                album_name = excluded.album_name, album_id = excluded.album_id,
+                album_images = excluded.album_images,
+                modified = now()
                 ",
                 spotify_id,
                 name,
                 artist_names.as_slice(),
-                item
+                artist_ids.as_slice(),
+                album_name,
+                album_id,
+                album_images,
             )
             .execute(pool)
             .await
@@ -553,7 +580,28 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
         let name = current["item"]["name"]
             .as_str()
             .ok_or_else(|| format!("currently playing name: unexpected shape {:?}", current))?;
+        let album_name = current["item"]["album"]["name"].as_str().ok_or_else(|| {
+            format!(
+                "currently playing album name: unexpected shape {:?}",
+                current
+            )
+        })?;
+        let album_id = current["item"]["album"]["id"].as_str().ok_or_else(|| {
+            format!(
+                "currently playing album name: unexpected shape {:?}",
+                current
+            )
+        })?;
+        let album_images = &current["item"]["album"]["images"];
+        if album_images.is_null() {
+            return Err(se!(
+                "currently playing album images: unexpected shape {:?}",
+                current
+            )
+            .into());
+        }
         let mut artist_names = vec![];
+        let mut artist_ids = vec![];
         for artist in current["item"]["artists"]
             .as_array()
             .ok_or_else(|| format!("currently playing artists: unexpected shape {:?}", current))?
@@ -566,6 +614,14 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
                             "currently playing artist name: unexpected shape {:?}",
                             artist
                         )
+                    })?
+                    .to_string(),
+            );
+            artist_ids.push(
+                artist["id"]
+                    .as_str()
+                    .ok_or_else(|| {
+                        format!("currently playing artist id: unexpected shape {:?}", artist)
                     })?
                     .to_string(),
             );
@@ -593,17 +649,23 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
             sqlx::query!(
                 "
                 insert into spot.tracks
-                (spotify_id, name, artist_names, raw)
+                (spotify_id, name, artist_names, artist_ids, album_name, album_id, album_images)
                 values
-                ($1, $2, $3, $4)
+                ($1, $2, $3, $4, $5, $6, $7)
                 on conflict (spotify_id) do update set
                 name = excluded.name, artist_names = excluded.artist_names,
-                raw = excluded.raw, modified = now()
+                artist_ids = excluded.artist_ids,
+                album_name = excluded.album_name, album_id = excluded.album_id,
+                album_images = excluded.album_images,
+                modified = now()
                 ",
                 spotify_id,
                 name,
                 artist_names.as_slice(),
-                current
+                artist_ids.as_slice(),
+                album_name,
+                album_id,
+                album_images
             )
             .execute(pool)
             .await

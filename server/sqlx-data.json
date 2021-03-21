@@ -591,21 +591,6 @@
       ]
     }
   },
-  "c24f7d56942a933468dc83fd1df8f38567518fa5f27c08db0df0366554f716d1": {
-    "query": "\n                insert into spot.tracks\n                (spotify_id, name, artist_names, raw)\n                values\n                ($1, $2, $3, $4)\n                on conflict (spotify_id) do update set\n                name = excluded.name, artist_names = excluded.artist_names,\n                raw = excluded.raw, modified = now()\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "TextArray",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "f85f1b9ad0ea81d7c02b867d0d373fa1d97c6628b5872904f31522ee99974f13": {
     "query": "\n        insert into\n        spot.auth_tokens (\n            hash, user_id, expires\n        )\n        values ($1, $2, $3)\n        ",
     "describe": {
@@ -615,6 +600,24 @@
           "Text",
           "Int8",
           "Timestamptz"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "fb5a11a471a196dd67c8564ecc90dd58a5ac4522b1ed5e88581fbdd638e00be8": {
+    "query": "\n                insert into spot.tracks\n                (spotify_id, name, artist_names, artist_ids, album_name, album_id, album_images)\n                values\n                ($1, $2, $3, $4, $5, $6, $7)\n                on conflict (spotify_id) do update set\n                name = excluded.name, artist_names = excluded.artist_names,\n                artist_ids = excluded.artist_ids,\n                album_name = excluded.album_name, album_id = excluded.album_id,\n                album_images = excluded.album_images,\n                modified = now()\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "TextArray",
+          "TextArray",
+          "Text",
+          "Text",
+          "Jsonb"
         ]
       },
       "nullable": []
