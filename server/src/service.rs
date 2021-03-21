@@ -1,8 +1,8 @@
 use cached::Cached;
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use sqlx::PgPool;
 
-use crate::{crypto, json_resp, models, se, spotify, utils, Result, CONFIG, LOG};
+use crate::{crypto, models, resp, se, spotify, utils, Result, CONFIG, LOG};
 
 #[derive(Clone)]
 struct Context {
@@ -39,7 +39,7 @@ struct Status<'a> {
 }
 
 async fn status(_req: tide::Request<Context>) -> tide::Result {
-    Ok(json_resp!(Status {
+    Ok(resp!(json => Status {
         ok: "ok",
         version: &CONFIG.version
     }))
@@ -173,19 +173,62 @@ struct RecentResponse {
     recent: Vec<models::Play>,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct RecentParams {
+    days: Option<u64>,
+}
+impl RecentParams {
+    fn range_days(&self) -> i64 {
+        self.days.unwrap_or(7) as i64
+    }
+    fn range_start(&self) -> DateTime<Utc> {
+        Utc::now()
+            .checked_sub_signed(Duration::days(self.range_days()))
+            .or_else(|| Some("2021-03-01".parse::<DateTime<Utc>>().unwrap()))
+            .unwrap()
+    }
+}
+macro_rules! params_or_error {
+    ($req:expr) => {{
+        match $req.query::<RecentParams>() {
+            Err(e) => {
+                slog::error!(LOG, "invalid recent query params {:?}", e);
+                return Ok(resp!(status => 400, message => "invalid query parameters"));
+            }
+            Ok(params) => params,
+        }
+    }};
+}
+
 async fn recent(req: tide::Request<Context>) -> tide::Result {
     let user = user_or_redirect!(req);
     let ctx = req.state();
+    let params = params_or_error!(req);
+    let range_start = params.range_start();
+    slog::info!(
+        LOG, "fetching recent plays for user";
+        "user" => &user.id,
+        "params" => serde_json::to_string(&params).ok(),
+        "range_days" => params.range_days(),
+        "range_start" => params.range_start().to_string(),
+    );
     let recent = sqlx::query_as!(
         models::Play,
-        "select * from spot.plays where user_id = $1 order by played_at desc",
-        &user.id
+        "
+        select *
+        from spot.plays
+        where user_id = $1
+            and played_at > $2
+        order by played_at desc
+        ",
+        &user.id,
+        range_start,
     )
     .fetch_all(&ctx.pool)
     .await
     .map_err(|e| se!("error getting plays for user {} {}", user.id, e))?;
 
-    Ok(json_resp!(RecentResponse {
+    Ok(resp!(json => RecentResponse {
         count: recent.len(),
         recent,
     }))
@@ -199,22 +242,33 @@ struct SummaryResponse {
 async fn summary(req: tide::Request<Context>) -> tide::Result {
     let user = user_or_redirect!(req);
     let ctx = req.state();
+    let params = params_or_error!(req);
+    let range_start = params.range_start();
+    slog::info!(
+        LOG, "fetching play summary for user";
+        "user" => &user.id,
+        "params" => serde_json::to_string(&params).ok(),
+        "range_days" => params.range_days(),
+        "range_start" => params.range_start().to_string(),
+    );
     let summary = sqlx::query_as!(
         models::PlaySummary,
         "
         select played_at::date as date, count(*)
-        from spot.plays
+            from spot.plays
         where user_id = $1
+            and played_at > $2
         group by played_at::date
         order by played_at::date desc
         ",
-        &user.id
+        &user.id,
+        &range_start,
     )
     .fetch_all(&ctx.pool)
     .await
     .map_err(|e| se!("error getting play summary for user {} {}", user.id, e))?;
 
-    Ok(json_resp!(SummaryResponse { summary }))
+    Ok(resp!(json => SummaryResponse { summary }))
 }
 
 #[derive(Debug, serde::Deserialize)]

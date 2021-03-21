@@ -125,74 +125,6 @@
       "nullable": []
     }
   },
-  "20c47d3cc32e5166a055778d4f40a985f1100211afdd615897a58627095662e9": {
-    "query": "select * from spot.plays where user_id = $1 order by played_at desc",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "spotify_id",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "played_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "played_at_minute",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 7,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 8,
-          "name": "artist_names",
-          "type_info": "TextArray"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "21f9b6bb08cbc944d91697e04ed234345b2d548fb72814e777540b60ab038d0a": {
     "query": "\n        update spot.users set access_token = $1, access_nonce = $2, access_expires = $3, modified = now() where id = $4 returning *\n        ",
     "describe": {
@@ -471,6 +403,102 @@
       ]
     }
   },
+  "736e89a4dd0ddf3eb4fcd5c485973377e9b9f0bcae679b5c091d1f02f093d916": {
+    "query": "\n        select *\n        from spot.plays\n        where user_id = $1\n            and played_at > $2\n        order by played_at desc\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "spotify_id",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "played_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "played_at_minute",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 7,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "artist_names",
+          "type_info": "TextArray"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "a3fa5d77ddd470e35e7e4d1ba864c365077fda7afa3a69a8cb96f1cbe0fa13b3": {
+    "query": "\n        select played_at::date as date, count(*)\n            from spot.plays\n        where user_id = $1\n            and played_at > $2\n        group by played_at::date\n        order by played_at::date desc\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "date",
+          "type_info": "Date"
+        },
+        {
+          "ordinal": 1,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        null,
+        null
+      ]
+    }
+  },
   "aef42b3be2cfd675dc9e421fdac3be5e0870cd28913072e309392d83308f9b4b": {
     "query": "\n        insert into \n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        ) \n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9) \n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes, \n        access_token = excluded.access_token, access_nonce = excluded.access_nonce, \n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce, \n        access_expires = excluded.access_expires, auth_token = excluded.auth_token, \n        modified = now()\n        returning *\n        ",
     "describe": {
@@ -562,32 +590,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "bf53ca8379507ca4b3d74a483f1985919cae6bdff0e4bb51f0a1310751162638": {
-    "query": "\n        select played_at::date as date, count(*)\n        from spot.plays\n        where user_id = $1\n        group by played_at::date\n        order by played_at::date desc\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "date",
-          "type_info": "Date"
-        },
-        {
-          "ordinal": 1,
-          "name": "count",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": [
-        null,
-        null
       ]
     }
   },
