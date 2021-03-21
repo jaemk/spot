@@ -68,11 +68,17 @@ macro_rules! se {
 }
 
 #[macro_export]
-macro_rules! json_resp {
-    ($obj:expr) => {{
+macro_rules! resp {
+    (json => $obj:expr) => {{
         tide::Response::builder(200)
             .content_type("application/json")
             .body(serde_json::to_string(&$obj)?)
+            .build()
+    }};
+    (status => $status:expr, message => $msg:expr) => {{
+        tide::Response::builder($status)
+            .content_type("text/plain")
+            .body($msg)
             .build()
     }};
 }
