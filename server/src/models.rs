@@ -31,6 +31,12 @@ pub struct NewPlay {
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
+pub struct PlaySummary {
+    pub played_at: Option<chrono::NaiveDate>,
+    pub count: Option<i64>,
+}
+
+#[derive(sqlx::FromRow, Debug, serde::Serialize)]
 pub struct User {
     pub id: i64,
     // email reported by spotify, we're assuming this is unique
