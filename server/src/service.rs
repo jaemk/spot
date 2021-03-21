@@ -17,6 +17,7 @@ pub async fn start(pool: sqlx::PgPool) -> crate::Result<()> {
     app.at("/login").get(login);
     app.at("/auth").get(auth_callback);
     app.at("/recent").get(recent);
+    app.at("/summary").get(summary);
     app.with(crate::logging::LogMiddleware::new());
 
     slog::info!(LOG, "running at {}", crate::CONFIG.host());
@@ -167,7 +168,7 @@ macro_rules! user_or_redirect {
 }
 
 #[derive(serde::Serialize)]
-struct Recent {
+struct RecentResponse {
     count: usize,
     recent: Vec<models::Play>,
 }
@@ -175,19 +176,45 @@ struct Recent {
 async fn recent(req: tide::Request<Context>) -> tide::Result {
     let user = user_or_redirect!(req);
     let ctx = req.state();
-    let history = sqlx::query_as!(
+    let recent = sqlx::query_as!(
         models::Play,
         "select * from spot.plays where user_id = $1 order by played_at desc",
         &user.id
     )
     .fetch_all(&ctx.pool)
     .await
-    .map_err(|e| se!("error getting plays for user {}", e))?;
+    .map_err(|e| se!("error getting plays for user {} {}", user.id, e))?;
 
-    Ok(json_resp!(Recent {
-        count: history.len(),
-        recent: history,
+    Ok(json_resp!(RecentResponse {
+        count: recent.len(),
+        recent,
     }))
+}
+
+#[derive(serde::Serialize)]
+struct SummaryResponse {
+    summary: Vec<models::PlaySummary>,
+}
+
+async fn summary(req: tide::Request<Context>) -> tide::Result {
+    let user = user_or_redirect!(req);
+    let ctx = req.state();
+    let summary = sqlx::query_as!(
+        models::PlaySummary,
+        "
+        select played_at::date, count(*)
+        from spot.plays
+        where user_id = $1
+        group by played_at::date
+        order by played_at::date desc
+        ",
+        &user.id
+    )
+    .fetch_all(&ctx.pool)
+    .await
+    .map_err(|e| se!("error getting play summary for user {} {}", user.id, e))?;
+
+    Ok(json_resp!(SummaryResponse { summary }))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -603,8 +630,6 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
             .map_err(|e| format!("failed to insert play for user {:?} {:?}", user.id, e))?;
             if new_play.created == new_play.modified {
                 slog::info!(LOG, "{} new current song {}", &user.email, name);
-            } else {
-                slog::info!(LOG, "{} currently listening to {}", &user.email, name);
             }
         }
     };
