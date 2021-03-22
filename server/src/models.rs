@@ -23,6 +23,7 @@ pub struct Play {
     pub played_at_minute: chrono::DateTime<chrono::Utc>,
     pub name: String,
     pub artist_names: Vec<String>,
+    pub last_known_listen: Option<chrono::DateTime<chrono::Utc>>,
     pub created: chrono::DateTime<chrono::Utc>,
     pub modified: chrono::DateTime<chrono::Utc>,
 }
@@ -65,12 +66,26 @@ pub struct User {
     // timestamp in seconds from epoch when the current
     // spotify access_token expires
     pub access_expires: i64,
+    pub last_known_listen: Option<chrono::DateTime<chrono::Utc>>,
     pub created: chrono::DateTime<chrono::Utc>,
     pub modified: chrono::DateTime<chrono::Utc>,
 
     // This has been deprecated in favor of multiple tokens
     // saved in the auth_tokens table.
     pub auth_token: String,
+}
+
+#[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CurrentUser {
+    pub user_id: i64,
+    pub user_name: String,
+    pub play_id: i64,
+    pub played_at: chrono::DateTime<chrono::Utc>,
+    pub played_at_minute: chrono::DateTime<chrono::Utc>,
+    pub track_name: String,
+    pub track_artist_names: Vec<String>,
+    pub last_known_listen: Option<chrono::DateTime<chrono::Utc>>,
+    pub is_listening: Option<bool>,
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
