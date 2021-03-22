@@ -16,6 +16,7 @@ pub async fn start(pool: sqlx::PgPool) -> crate::Result<()> {
     app.at("/status").get(status);
     app.at("/login").get(login);
     app.at("/auth").get(auth_callback);
+    app.at("/current").get(current_user);
     app.at("/recent").get(recent);
     app.at("/summary").get(summary);
     app.with(crate::logging::LogMiddleware::new());
@@ -143,10 +144,10 @@ async fn auth_callback(req: tide::Request<Context>) -> tide::Result {
     Ok(tide::Response::builder(200)
         .header("set-cookie", cookie_str)
         .body(serde_json::json!({
-        "ok": "ok",
-        "user.id": user.id,
-        "user.display_name": &user.name,
-        "user.email": &user.email,
+            "ok": "ok",
+            "user.id": user.id,
+            "user.display_name": &user.name,
+            "user.email": &user.email,
         }))
         .build())
 }
@@ -165,6 +166,39 @@ macro_rules! user_or_redirect {
         }
         user.unwrap()
     }};
+}
+
+#[derive(serde::Serialize)]
+struct CurrentUserResponse {
+    user: models::CurrentUser,
+}
+
+async fn current_user(req: tide::Request<Context>) -> tide::Result {
+    let user = user_or_redirect!(req);
+    let ctx = req.state();
+    let current = sqlx::query_as!(
+        models::CurrentUser,
+        "
+        select
+            distinct on(u.id) u.id as user_id,
+            u.name as user_name,
+            p.id as play_id,
+            p.played_at,
+            p.played_at_minute,
+            p.name as track_name,
+            p.artist_names as track_artist_names,
+            p.last_known_listen,
+            extract(epoch from(now() - p.last_known_listen)) < 60 as is_listening
+        from spot.users u inner join spot.plays p on u.id = p.user_id
+        where u.id = $1
+        order by u.id, p.played_at desc, p.id
+        ",
+        &user.id
+    )
+    .fetch_one(&ctx.pool)
+    .await
+    .map_err(|e| se!("error fetching current user {:?}", e))?;
+    Ok(resp!(json => CurrentUserResponse { user: current }))
 }
 
 #[derive(serde::Serialize)]
@@ -613,12 +647,22 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
             return Ok(());
         }
 
+        let is_playing = current["is_playing"].as_bool().ok_or_else(|| {
+            se!(
+                "currently playing is_playing: unexpected shape {:?}",
+                current
+            )
+        })?;
+        if !is_playing {
+            return Ok(());
+        }
+
         // timestamp is the "play start" time. This value seems like
         // it gets updated whenever you pause or unpause the current track
         // which means we need to dedupe against the current latest in
         // our db so we don't keep inserting plays when you pause/unpause.
         let start_millis = current["timestamp"].as_i64().ok_or_else(|| {
-            format!(
+            se!(
                 "currently playing timestamp: unexpected shape {:?}",
                 current
             )
@@ -626,22 +670,22 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
         let played_at = chrono::Utc.timestamp_millis(start_millis);
         let played_at_minute = utils::truncate_to_minute(played_at)?;
         let spotify_id = current["item"]["id"].as_str().ok_or_else(|| {
-            format!(
+            se!(
                 "currently playing spotify_id: unexpected shape {:?}",
                 current
             )
         })?;
         let name = current["item"]["name"]
             .as_str()
-            .ok_or_else(|| format!("currently playing name: unexpected shape {:?}", current))?;
+            .ok_or_else(|| se!("currently playing name: unexpected shape {:?}", current))?;
         let album_name = current["item"]["album"]["name"].as_str().ok_or_else(|| {
-            format!(
+            se!(
                 "currently playing album name: unexpected shape {:?}",
                 current
             )
         })?;
         let album_id = current["item"]["album"]["id"].as_str().ok_or_else(|| {
-            format!(
+            se!(
                 "currently playing album name: unexpected shape {:?}",
                 current
             )
@@ -658,13 +702,13 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
         let mut artist_ids = vec![];
         for artist in current["item"]["artists"]
             .as_array()
-            .ok_or_else(|| format!("currently playing artists: unexpected shape {:?}", current))?
+            .ok_or_else(|| se!("currently playing artists: unexpected shape {:?}", current))?
         {
             artist_names.push(
                 artist["name"]
                     .as_str()
                     .ok_or_else(|| {
-                        format!(
+                        se!(
                             "currently playing artist name: unexpected shape {:?}",
                             artist
                         )
@@ -675,11 +719,22 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
                 artist["id"]
                     .as_str()
                     .ok_or_else(|| {
-                        format!("currently playing artist id: unexpected shape {:?}", artist)
+                        se!("currently playing artist id: unexpected shape {:?}", artist)
                     })?
                     .to_string(),
             );
         }
+        sqlx::query!(
+            "
+            update spot.users
+                set last_known_listen = now()
+                where id = $1
+            ",
+            &user.id,
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| se!("failed updating user last known listen {:?}", e))?;
         let latest = sqlx::query_as!(
             models::Play,
             "
@@ -691,14 +746,32 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
         )
         .fetch_optional(pool)
         .await
-        .map_err(|e| format!("failed fetching optional latest play {:?}", e))?;
-        if latest.is_some() && latest.unwrap().spotify_id == spotify_id {
+        .map_err(|e| se!("failed fetching optional latest play {:?}", e))?;
+
+        let current_is_latest = latest
+            .as_ref()
+            .map(|play| play.spotify_id == spotify_id)
+            .unwrap_or(false);
+        if current_is_latest {
+            let latest = latest.unwrap();
             slog::debug!(
                 LOG,
                 "{} currently listening to {} (no change)",
                 &user.email,
                 name
             );
+            sqlx::query!(
+                "
+                update spot.plays
+                    set modified = now(),
+                        last_known_listen = now()
+                    where id = $1
+                ",
+                &latest.id,
+            )
+            .execute(pool)
+            .await
+            .map_err(|e| se!("failed updating play last known listen {:?}", e))?;
         } else {
             sqlx::query!(
                 "
@@ -723,15 +796,16 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
             )
             .execute(pool)
             .await
-            .map_err(|e| format!("failed to upsert track {:?}", e))?;
+            .map_err(|e| se!("failed to upsert track {:?}", e))?;
             let new_play = sqlx::query_as!(
                 models::NewPlay,
                 "
                 insert into spot.plays
-                (user_id, spotify_id, played_at, played_at_minute, name, artist_names)
+                (user_id, spotify_id, played_at, played_at_minute, name, artist_names, last_known_listen)
                 values
-                ($1, $2, $3, $4, $5, $6)
-                on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()
+                ($1, $2, $3, $4, $5, $6, now())
+                on conflict (user_id, spotify_id, played_at_minute)
+                do update set modified = now(), last_known_listen = excluded.last_known_listen
                 returning id, created, modified
                 ",
                 &user.id,
@@ -743,7 +817,7 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
             )
             .fetch_one(pool)
             .await
-            .map_err(|e| format!("failed to insert play for user {:?} {:?}", user.id, e))?;
+            .map_err(|e| se!("failed to insert play for user {:?} {:?}", user.id, e))?;
             if new_play.created == new_play.modified {
                 slog::info!(LOG, "{} new current song {}", &user.email, name);
             }

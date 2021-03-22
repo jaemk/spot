@@ -90,6 +90,11 @@
           "ordinal": 11,
           "name": "modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -109,7 +114,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -188,6 +194,11 @@
           "ordinal": 11,
           "name": "modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -210,7 +221,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -262,6 +274,11 @@
           "ordinal": 8,
           "name": "artist_names",
           "type_info": "TextArray"
+        },
+        {
+          "ordinal": 9,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -278,7 +295,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -345,6 +363,11 @@
           "ordinal": 11,
           "name": "modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -362,7 +385,8 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
     }
   },
@@ -451,6 +475,11 @@
           "ordinal": 8,
           "name": "artist_names",
           "type_info": "TextArray"
+        },
+        {
+          "ordinal": 9,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -468,8 +497,21 @@
         false,
         false,
         false,
-        false
+        false,
+        true
       ]
+    }
+  },
+  "73e89f9b230e1435671f5d1839240ae490dab6988427cc3a95f0801289fa1df5": {
+    "query": "\n                update spot.plays\n                    set modified = now(),\n                        last_known_listen = now()\n                    where id = $1\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "a3fa5d77ddd470e35e7e4d1ba864c365077fda7afa3a69a8cb96f1cbe0fa13b3": {
@@ -495,6 +537,74 @@
       },
       "nullable": [
         null,
+        null
+      ]
+    }
+  },
+  "ac28a4ff0fdc7ed586ecf2f1c1f1c6857b6efc037801cc6fb0325b9da184abc6": {
+    "query": "\n        select\n            distinct on(u.id) u.id as user_id,\n            u.name as user_name,\n            p.id as play_id,\n            p.played_at,\n            p.played_at_minute,\n            p.name as track_name,\n            p.artist_names as track_artist_names,\n            p.last_known_listen,\n            extract(epoch from(now() - p.last_known_listen)) < 60 as is_listening\n        from spot.users u inner join spot.plays p on u.id = p.user_id\n        where u.id = $1\n        order by u.id, p.played_at desc, p.id\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "user_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "play_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "played_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "played_at_minute",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "track_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "track_artist_names",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 7,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 8,
+          "name": "is_listening",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
         null
       ]
     }
@@ -562,6 +672,11 @@
           "ordinal": 11,
           "name": "modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -587,6 +702,56 @@
         false,
         false,
         false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
+  "eb5f3766a684ed1aa7c9cc83d5aff849b26e865a61c5da04ab79f6a1c7c361cd": {
+    "query": "\n            update spot.users\n                set last_known_listen = now()\n                where id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "ef3f8442850134c61c710e1ad0ff23c838f3730e2449d7abda72961100f9e72f": {
+    "query": "\n                insert into spot.plays\n                (user_id, spotify_id, played_at, played_at_minute, name, artist_names, last_known_listen)\n                values\n                ($1, $2, $3, $4, $5, $6, now())\n                on conflict (user_id, spotify_id, played_at_minute)\n                do update set modified = now(), last_known_listen = excluded.last_known_listen\n                returning id, created, modified\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Text",
+          "Timestamptz",
+          "Timestamptz",
+          "Text",
+          "TextArray"
+        ]
+      },
+      "nullable": [
         false,
         false,
         false
