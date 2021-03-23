@@ -75,19 +75,6 @@ pub struct User {
     pub auth_token: String,
 }
 
-#[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CurrentUser {
-    pub user_id: i64,
-    pub user_name: String,
-    pub play_id: i64,
-    pub played_at: chrono::DateTime<chrono::Utc>,
-    pub played_at_minute: chrono::DateTime<chrono::Utc>,
-    pub track_name: String,
-    pub track_artist_names: Vec<String>,
-    pub last_known_listen: Option<chrono::DateTime<chrono::Utc>>,
-    pub is_listening: Option<bool>,
-}
-
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
 pub struct AuthToken {
     pub id: i64,

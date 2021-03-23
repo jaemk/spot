@@ -17,8 +17,16 @@ pub async fn start(pool: sqlx::PgPool) -> crate::Result<()> {
     app.at("/login").get(login);
     app.at("/auth").get(auth_callback);
     app.at("/current").get(current_user);
+    app.at("/top").get(user_top);
     app.at("/recent").get(recent);
     app.at("/summary").get(summary);
+    app.at("/api/status").get(status);
+    app.at("/api/login").get(login);
+    app.at("/api/auth").get(auth_callback);
+    app.at("/api/current").get(current_user);
+    app.at("/api/top").get(user_top);
+    app.at("/api/recent").get(recent);
+    app.at("/api/summary").get(summary);
     app.with(crate::logging::LogMiddleware::new());
 
     slog::info!(LOG, "running at {}", crate::CONFIG.host());
@@ -168,16 +176,29 @@ macro_rules! user_or_redirect {
     }};
 }
 
+#[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CurrentUser {
+    pub user_id: i64,
+    pub user_name: String,
+    pub play_id: i64,
+    pub played_at: chrono::DateTime<chrono::Utc>,
+    pub played_at_minute: chrono::DateTime<chrono::Utc>,
+    pub track_name: String,
+    pub track_artist_names: Vec<String>,
+    pub last_known_listen: Option<chrono::DateTime<chrono::Utc>>,
+    pub is_listening: Option<bool>,
+}
+
 #[derive(serde::Serialize)]
 struct CurrentUserResponse {
-    user: models::CurrentUser,
+    user: CurrentUser,
 }
 
 async fn current_user(req: tide::Request<Context>) -> tide::Result {
     let user = user_or_redirect!(req);
     let ctx = req.state();
     let current = sqlx::query_as!(
-        models::CurrentUser,
+        CurrentUser,
         "
         select
             distinct on(u.id) u.id as user_id,
@@ -199,6 +220,42 @@ async fn current_user(req: tide::Request<Context>) -> tide::Result {
     .await
     .map_err(|e| se!("error fetching current user {:?}", e))?;
     Ok(resp!(json => CurrentUserResponse { user: current }))
+}
+
+#[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UserTop {
+    pub artist_names: Vec<String>,
+    pub count: Option<i64>,
+}
+
+#[derive(serde::Serialize)]
+struct TopResponse {
+    top: Vec<UserTop>,
+}
+
+async fn user_top(req: tide::Request<Context>) -> tide::Result {
+    let user = user_or_redirect!(req);
+    let ctx = req.state();
+    let top = sqlx::query_as!(
+        UserTop,
+        "
+        with src as (
+            select artist_names, count(*)
+            from spot.plays
+            where user_id = $1
+            group by artist_names
+        )
+        select artist_names, count
+        from src
+        order by count desc
+        limit 10
+        ",
+        &user.id
+    )
+    .fetch_all(&ctx.pool)
+    .await
+    .map_err(|e| se!("error fetching user top {:?}", e))?;
+    Ok(resp!(json => TopResponse { top }))
 }
 
 #[derive(serde::Serialize)]
@@ -831,14 +888,7 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         .fetch_all(pool)
         .await
         .map_err(|e| format!("error getting users for poll {:?}", e))?;
-    slog::info!(
-        LOG,
-        "currently playing poll users {:?}",
-        users
-            .iter()
-            .map(|u| u.email.as_str())
-            .collect::<Vec<&str>>()
-    );
+    slog::info!(LOG, "polling {} users", users.len());
     for user in &users {
         if let Err(e) = _currently_playing_user(pool, user).await {
             slog::error!(
