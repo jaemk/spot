@@ -709,6 +709,32 @@
       ]
     }
   },
+  "bd49137dd6ce669af96145d71f1c74d4bba756d3caf8b35e0aae270c9889b465": {
+    "query": "\n        with src as (\n            select artist_names, count(*)\n            from spot.plays\n            where user_id = $1\n            group by artist_names\n        )\n        select artist_names, count\n        from src\n        order by count desc\n        limit 10\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "artist_names",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 1,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        null
+      ]
+    }
+  },
   "eb5f3766a684ed1aa7c9cc83d5aff849b26e865a61c5da04ab79f6a1c7c361cd": {
     "query": "\n            update spot.users\n                set last_known_listen = now()\n                where id = $1\n            ",
     "describe": {
