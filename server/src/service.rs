@@ -703,6 +703,10 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
             );
             return Ok(());
         }
+        let spotify_id = &current["item"]["id"];
+        if spotify_id.is_null() {
+            return Ok(());
+        }
 
         let is_playing = current["is_playing"].as_bool().ok_or_else(|| {
             se!(
@@ -726,7 +730,7 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
         })?;
         let played_at = chrono::Utc.timestamp_millis(start_millis);
         let played_at_minute = utils::truncate_to_minute(played_at)?;
-        let spotify_id = current["item"]["id"].as_str().ok_or_else(|| {
+        let spotify_id = spotify_id.as_str().ok_or_else(|| {
             se!(
                 "currently playing spotify_id: unexpected shape {:?}",
                 current
