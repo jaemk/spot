@@ -67,6 +67,7 @@ pub struct User {
     // spotify access_token expires
     pub access_expires: i64,
     pub last_known_listen: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_poll: Option<chrono::DateTime<chrono::Utc>>,
     pub created: chrono::DateTime<chrono::Utc>,
     pub modified: chrono::DateTime<chrono::Utc>,
 

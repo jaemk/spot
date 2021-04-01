@@ -95,6 +95,11 @@
           "ordinal": 12,
           "name": "last_known_listen",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 13,
+          "name": "last_poll",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -115,6 +120,7 @@
         false,
         false,
         false,
+        true,
         true
       ]
     }
@@ -199,6 +205,11 @@
           "ordinal": 12,
           "name": "last_known_listen",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 13,
+          "name": "last_poll",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -222,6 +233,7 @@
         false,
         false,
         false,
+        true,
         true
       ]
     }
@@ -300,8 +312,8 @@
       ]
     }
   },
-  "5710e37dc915a2b2601918208f4aa227020581cc1f0e0d578c770d12c8b844af": {
-    "query": "select * from spot.users",
+  "6574d49c31d611a089fa38b94058ff95696ab5d131f987436f89d6beaa9e3e0b": {
+    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n        ",
     "describe": {
       "columns": [
         {
@@ -368,10 +380,18 @@
           "ordinal": 12,
           "name": "last_known_listen",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 13,
+          "name": "last_poll",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
-        "Left": []
+        "Left": [
+          "Timestamptz",
+          "Timestamptz"
+        ]
       },
       "nullable": [
         false,
@@ -386,6 +406,7 @@
         false,
         false,
         false,
+        true,
         true
       ]
     }
@@ -424,6 +445,105 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "72c6a08a3f7092a4f5bbb3dea414f26a177f8ff5cd7ebb9ca3f3d2a4054ac5f1": {
+    "query": "\n        select * from spot.users\n        where\n            (last_known_listen >= $1 and last_poll < $2)\n            or last_known_listen is null\n            or last_poll is null\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "scopes",
+          "type_info": "TextArray"
+        },
+        {
+          "ordinal": 4,
+          "name": "access_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "access_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 6,
+          "name": "refresh_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_nonce",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 8,
+          "name": "access_expires",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "auth_token",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 10,
+          "name": "created",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 11,
+          "name": "modified",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 12,
+          "name": "last_known_listen",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 13,
+          "name": "last_poll",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
       ]
     }
   },
@@ -677,6 +797,11 @@
           "ordinal": 12,
           "name": "last_known_listen",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 13,
+          "name": "last_poll",
+          "type_info": "Timestamptz"
         }
       ],
       "parameters": {
@@ -705,8 +830,21 @@
         false,
         false,
         false,
+        true,
         true
       ]
+    }
+  },
+  "b4fad77dd32d6122f152c4be28055a57539bc5414aefecacd85ad6fc7e159b05": {
+    "query": "\n            update spot.users\n                set last_poll = now(), modified = now()\n                where id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
     }
   },
   "bd49137dd6ce669af96145d71f1c74d4bba756d3caf8b35e0aae270c9889b465": {
