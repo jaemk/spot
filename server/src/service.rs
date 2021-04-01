@@ -3,6 +3,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use sqlx::PgPool;
 
 use crate::{crypto, models, resp, se, spotify, utils, Result, CONFIG, LOG};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 struct Context {
@@ -888,12 +889,66 @@ async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<(
 }
 
 async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
-    let users = sqlx::query_as!(models::User, "select * from spot.users")
-        .fetch_all(pool)
-        .await
-        .map_err(|e| format!("error getting users for poll {:?}", e))?;
-    slog::info!(LOG, "polling {} users", users.len());
-    for user in &users {
+    let now = Utc::now();
+    let two_minutes_ago = now
+        .checked_sub_signed(Duration::seconds(120))
+        .ok_or_else(|| se!("error subtracting 2mins from now"))?;
+    let ten_seconds_ago = now
+        .checked_sub_signed(Duration::seconds(10))
+        .ok_or_else(|| se!("error subtracting 10s from now"))?;
+    let thirty_seconds_ago = now
+        .checked_sub_signed(Duration::seconds(30))
+        .ok_or_else(|| se!("error subtracting 30s from now"))?;
+
+    // Active users have last_known_listen within the past 2 minutes.
+    // We should re-poll them after 10 seconds since their last poll.
+    let active_users = sqlx::query_as!(
+        models::User,
+        "
+        select * from spot.users
+        where
+            (last_known_listen >= $1 and last_poll < $2)
+            or last_known_listen is null
+            or last_poll is null
+        ",
+        &two_minutes_ago,
+        &ten_seconds_ago,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("error getting active users for poll {:?}", e))?;
+
+    // Inactive users have last_known_listen outside of the past 2 minutes.
+    // We should re-poll them after 30s since their last poll.
+    let inactive_users = sqlx::query_as!(
+        models::User,
+        "
+        select * from spot.users
+        where last_known_listen < $1
+            and last_poll < $2
+        ",
+        &two_minutes_ago,
+        &thirty_seconds_ago,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("error getting inactive users for poll {:?}", e))?;
+
+    let active_users_count = active_users.len();
+    let inactive_users_count = inactive_users.len();
+
+    // dedup
+    let mut users = HashMap::with_capacity(active_users.len() + inactive_users.len());
+    for u in active_users.into_iter().chain(inactive_users.into_iter()) {
+        users.insert(u.id, u);
+    }
+
+    slog::info!(
+        LOG, "polling {} users", users.len();
+        "active_users" => active_users_count,
+        "inactive_users" => inactive_users_count,
+    );
+    for user in users.values() {
         if let Err(e) = _currently_playing_user(pool, user).await {
             slog::error!(
                 LOG,
@@ -901,6 +956,20 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
                 user,
                 e
             );
+        }
+
+        if let Err(e) = sqlx::query!(
+            "
+            update spot.users
+                set last_poll = now(), modified = now()
+                where id = $1
+            ",
+            &user.id,
+        )
+        .execute(pool)
+        .await
+        {
+            slog::error!(LOG, "error setting last_poll for user {:?} {:?}", user, e)
         }
     }
     Ok(())
