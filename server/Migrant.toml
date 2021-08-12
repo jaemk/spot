@@ -12,7 +12,7 @@ database_host = "env:DB_HOST"         # default "localhost"
 database_port = "env:DB_PORT"              # default "5432"
 migration_location = "migrations"  # default "migrations"
 
-ssl_cert_file = "../bin/cert.crt"
+#ssl_cert_file = "../bin/cert.crt"
 
 # Extra database connection parameters
 # with the format:
