@@ -75,9 +75,12 @@ pub async fn refresh_access_token(refresh_token: &str) -> crate::Result<SpotifyA
         .send()
         .await
         .map_err(|e| format!("account refresh request error {:?}", e))?;
-    let access: SpotifyAccess = resp
+    let access: serde_json::Value = resp
         .body_json()
         .await
+        .map_err(|e| format!("account refresh json parse to value error {:?}", e))?;
+    slog::info!(LOG, "refresh data: {:?}", access);
+    let access: SpotifyAccess = serde_json::from_value(access)
         .map_err(|e| format!("account refresh json parse error {:?}", e))?;
     Ok(access)
 }
