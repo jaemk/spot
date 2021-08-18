@@ -26,6 +26,15 @@ impl std::fmt::Display for StringError {
 }
 impl std::error::Error for StringError {}
 
+#[derive(Debug)]
+struct UserAccessRevokedError;
+impl std::error::Error for UserAccessRevokedError {}
+impl std::fmt::Display for UserAccessRevokedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "user access revoked")
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 fn env_or(k: &str, default: &str) -> String {

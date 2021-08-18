@@ -79,9 +79,16 @@ pub async fn refresh_access_token(refresh_token: &str) -> crate::Result<SpotifyA
         .body_json()
         .await
         .map_err(|e| format!("account refresh json parse to value error {:?}", e))?;
-    slog::info!(LOG, "refresh data: {:?}", access);
+    let copy = access.clone();
+
+    if let Some(err) = access["error"].as_str() {
+        if err == "invalid_grant" {
+            return Err(Box::new(crate::UserAccessRevokedError));
+        }
+    }
+
     let access: SpotifyAccess = serde_json::from_value(access)
-        .map_err(|e| format!("account refresh json parse error {:?}", e))?;
+        .map_err(|e| format!("account refresh json parse error {:?}: {:?}", e, copy))?;
     Ok(access)
 }
 

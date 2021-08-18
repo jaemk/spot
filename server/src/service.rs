@@ -437,20 +437,20 @@ async fn upsert_user(
     let user = sqlx::query_as!(
         models::User,
         "
-        insert into 
+        insert into
         spot.users (
             email, name, scopes,
             access_token, access_nonce,
             refresh_token, refresh_nonce,
             access_expires,
             auth_token
-        ) 
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
-        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes, 
-        access_token = excluded.access_token, access_nonce = excluded.access_nonce, 
-        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce, 
-        access_expires = excluded.access_expires, auth_token = excluded.auth_token, 
-        modified = now()
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes,
+        access_token = excluded.access_token, access_nonce = excluded.access_nonce,
+        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce,
+        access_expires = excluded.access_expires, auth_token = excluded.auth_token,
+        modified = now(), revoked = false
         returning *
         ",
         &name_email.email,
@@ -689,8 +689,38 @@ async fn _recently_played_user(pool: &PgPool, user: &models::User) -> Result<()>
     Ok(())
 }
 
+async fn revoke_user(pool: &PgPool, user: &models::User) -> Result<()> {
+    slog::info!(LOG, "revoking user {}", user.id);
+    sqlx::query!(
+        "
+        update spot.users
+            set revoked = true
+            where id = $1
+        ",
+        &user.id,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| se!("failed updating user revoked status {:?}", e))?;
+    Ok(())
+}
+
 async fn _currently_playing_user(pool: &PgPool, user: &models::User) -> Result<()> {
-    let current = spotify::get_currently_playing(pool, user).await?;
+    let (revoke, current) = match spotify::get_currently_playing(pool, user).await {
+        Ok(c) => (false, c),
+        Err(e) => {
+            if e.downcast_ref::<crate::UserAccessRevokedError>().is_some() {
+                (true, None)
+            } else {
+                return Err(e);
+            }
+        }
+    };
+    if revoke {
+        revoke_user(pool, user).await?;
+        return Ok(());
+    }
+
     if let Some(current) = current {
         // Non "track" things like podcasts, return a null item (track)
         // ignore these for now. They also don't appear to come back at all
@@ -907,9 +937,12 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         "
         select * from spot.users
         where
-            (last_known_listen >= $1 and last_poll < $2)
-            or last_known_listen is null
-            or last_poll is null
+            revoked is false
+            and (
+                (last_known_listen >= $1 and last_poll < $2)
+                or last_known_listen is null
+                or last_poll is null
+            )
         ",
         &two_minutes_ago,
         &ten_seconds_ago,
@@ -926,6 +959,7 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         select * from spot.users
         where last_known_listen < $1
             and last_poll < $2
+            and revoked is false
         ",
         &two_minutes_ago,
         &thirty_seconds_ago,
@@ -953,7 +987,7 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
             slog::error!(
                 LOG,
                 "error polling currently playing for user {:?} {:?}",
-                user,
+                &user.email,
                 e
             );
         }

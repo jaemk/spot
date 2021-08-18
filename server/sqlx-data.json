@@ -100,6 +100,11 @@
           "ordinal": 13,
           "name": "last_poll",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 14,
+          "name": "revoked",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -121,7 +126,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -210,6 +216,11 @@
           "ordinal": 13,
           "name": "last_poll",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 14,
+          "name": "revoked",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -234,7 +245,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -312,8 +324,8 @@
       ]
     }
   },
-  "6574d49c31d611a089fa38b94058ff95696ab5d131f987436f89d6beaa9e3e0b": {
-    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n        ",
+  "5335d7f920181b1ef38a30a15010f1a0833b97ad1e53a603f28cd7f50b93bace": {
+    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n            and revoked is false\n        ",
     "describe": {
       "columns": [
         {
@@ -385,6 +397,11 @@
           "ordinal": 13,
           "name": "last_poll",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 14,
+          "name": "revoked",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
@@ -407,7 +424,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -448,8 +466,8 @@
       ]
     }
   },
-  "72c6a08a3f7092a4f5bbb3dea414f26a177f8ff5cd7ebb9ca3f3d2a4054ac5f1": {
-    "query": "\n        select * from spot.users\n        where\n            (last_known_listen >= $1 and last_poll < $2)\n            or last_known_listen is null\n            or last_poll is null\n        ",
+  "719167a14d2e815019fd9ca3a8da3cc8763deb112ad9914cdbb051c97c7d342b": {
+    "query": "\n        insert into\n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        )\n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes,\n        access_token = excluded.access_token, access_nonce = excluded.access_nonce,\n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce,\n        access_expires = excluded.access_expires, auth_token = excluded.auth_token,\n        modified = now(), revoked = false\n        returning *\n        ",
     "describe": {
       "columns": [
         {
@@ -521,12 +539,24 @@
           "ordinal": 13,
           "name": "last_poll",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 14,
+          "name": "revoked",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
         "Left": [
-          "Timestamptz",
-          "Timestamptz"
+          "Text",
+          "Text",
+          "TextArray",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Int8",
+          "Text"
         ]
       },
       "nullable": [
@@ -543,7 +573,8 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
     }
   },
@@ -624,6 +655,18 @@
   },
   "73e89f9b230e1435671f5d1839240ae490dab6988427cc3a95f0801289fa1df5": {
     "query": "\n                update spot.plays\n                    set modified = now(),\n                        last_known_listen = now()\n                    where id = $1\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "76c9d89ba494f065aa59ab3ac197f92d313cf79dcabde2e73e55aec4e8bce1c0": {
+    "query": "\n        update spot.users\n            set revoked = true\n            where id = $1\n        ",
     "describe": {
       "columns": [],
       "parameters": {
@@ -729,8 +772,20 @@
       ]
     }
   },
-  "aef42b3be2cfd675dc9e421fdac3be5e0870cd28913072e309392d83308f9b4b": {
-    "query": "\n        insert into \n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        ) \n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9) \n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes, \n        access_token = excluded.access_token, access_nonce = excluded.access_nonce, \n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce, \n        access_expires = excluded.access_expires, auth_token = excluded.auth_token, \n        modified = now()\n        returning *\n        ",
+  "b4fad77dd32d6122f152c4be28055a57539bc5414aefecacd85ad6fc7e159b05": {
+    "query": "\n            update spot.users\n                set last_poll = now(), modified = now()\n                where id = $1\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "b7e7a92c395eadb8849c33bf539422494f93b9e45bde8c189813b958d55cf88e": {
+    "query": "\n        select * from spot.users\n        where\n            revoked is false\n            and (\n                (last_known_listen >= $1 and last_poll < $2)\n                or last_known_listen is null\n                or last_poll is null\n            )\n        ",
     "describe": {
       "columns": [
         {
@@ -802,19 +857,17 @@
           "ordinal": 13,
           "name": "last_poll",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 14,
+          "name": "revoked",
+          "type_info": "Bool"
         }
       ],
       "parameters": {
         "Left": [
-          "Text",
-          "Text",
-          "TextArray",
-          "Text",
-          "Text",
-          "Text",
-          "Text",
-          "Int8",
-          "Text"
+          "Timestamptz",
+          "Timestamptz"
         ]
       },
       "nullable": [
@@ -831,20 +884,9 @@
         false,
         false,
         true,
-        true
+        true,
+        false
       ]
-    }
-  },
-  "b4fad77dd32d6122f152c4be28055a57539bc5414aefecacd85ad6fc7e159b05": {
-    "query": "\n            update spot.users\n                set last_poll = now(), modified = now()\n                where id = $1\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
     }
   },
   "bd49137dd6ce669af96145d71f1c74d4bba756d3caf8b35e0aae270c9889b465": {

@@ -74,6 +74,8 @@ pub struct User {
     // This has been deprecated in favor of multiple tokens
     // saved in the auth_tokens table.
     pub auth_token: String,
+
+    pub revoked: bool,
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]
