@@ -1,4 +1,4 @@
-FROM rust:1.50
+FROM rust:1.53
 
 RUN cargo install migrant --features postgres
 
@@ -29,15 +29,13 @@ RUN rm ./target/release/deps/server*
 ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
-# copy over git dir and embed latest commit hash
-# WORKDIR /app
-# COPY ./.git ./.git
-# # make sure there's no trailing newline
-# RUN git rev-parse HEAD | awk '{ printf "%s", $0 >"commit_hash.txt" }'
-# RUN rm -rf ./.git
-# RUN cp commit_hash.txt server/commit_hash.txt
-
 WORKDIR /app
+
+# copy over git dir and embed latest commit hash
+COPY ./.git ./.git
+# make sure there's no trailing newline
+RUN git rev-parse HEAD | awk '{ printf "%s", $0 >"commit_hash.txt" }'
+RUN rm -rf ./.git
 
 COPY ./bin ./bin
 COPY ./server/Migrant.toml ./server/Migrant.toml

@@ -115,7 +115,7 @@ impl Config {
             host: env_or("HOST", "localhost"),
             real_hostname: env::var("REAL_HOSTNAME").ok(),
             real_domain: env::var("REAL_DOMAIN").ok(),
-            port: env_or("PORT", "3030").parse().expect("invalid port"),
+            port: env_or("PORT", "3003").parse().expect("invalid port"),
             log_format: env_or("LOG_FORMAT", "json")
                 .to_lowercase()
                 .trim()
