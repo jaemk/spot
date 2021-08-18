@@ -39,7 +39,7 @@ async fn index(_req: tide::Request<Context>) -> tide::Result {
     slog::info!(LOG, "index redirecting to /recent");
     let resp: tide::Response =
         tide::Redirect::new(format!("{}/recent", CONFIG.redirect_host())).into();
-    return Ok(resp);
+    Ok(resp)
 }
 
 #[derive(serde::Serialize)]
@@ -424,7 +424,7 @@ async fn upsert_user(
 
     let access_token = crypto::encrypt(&access.access_token)?;
     let refresh_token = crypto::encrypt(
-        &access
+        access
             .refresh_token
             .as_ref()
             .ok_or_else(|| se!("missing refresh token"))?,

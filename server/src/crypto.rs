@@ -41,7 +41,7 @@ pub fn new_nonce() -> crate::Result<Vec<u8>> {
 
 pub fn hmac_sign(s: &str) -> String {
     // using a 32 byte key
-    let s_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, &crate::CONFIG.enc_key.as_bytes());
+    let s_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, crate::CONFIG.enc_key.as_bytes());
     let tag = ring::hmac::sign(&s_key, s.as_bytes());
     hex::encode(&tag)
 }
