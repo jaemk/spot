@@ -1,117 +1,111 @@
 {
   "db": "PostgreSQL",
   "023f12d139293049e29dd35c2f4a29a3d645822349139d47da6677bd8df6b7c0": {
-    "query": "\n            select\n                (select spotify_id from spot.plays\n                    where user_id = $1 and played_at <= $2\n                    order by played_at desc limit 1) as before,\n                (select spotify_id from spot.plays\n                    where user_id = $1 and played_at >= $2\n                    order by played_at asc limit 1) as after;\n            ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "before",
+          "ordinal": 0,
           "type_info": "Text"
         },
         {
-          "ordinal": 1,
           "name": "after",
+          "ordinal": 1,
           "type_info": "Text"
         }
+      ],
+      "nullable": [
+        null,
+        null
       ],
       "parameters": {
         "Left": [
           "Int8",
           "Timestamptz"
         ]
-      },
-      "nullable": [
-        null,
-        null
-      ]
-    }
+      }
+    },
+    "query": "\n            select\n                (select spotify_id from spot.plays\n                    where user_id = $1 and played_at <= $2\n                    order by played_at desc limit 1) as before,\n                (select spotify_id from spot.plays\n                    where user_id = $1 and played_at >= $2\n                    order by played_at asc limit 1) as after;\n            "
   },
   "0dc023abcf9916dd3b9ac8c196b8026b4c2677a5f3ee043268d5a1f0fadfb99d": {
-    "query": "\n                select u.*\n                from spot.users u\n                    inner join spot.auth_tokens at\n                    on u.id = at.user_id\n                where hash = $1 and expires > now()\n                ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "email",
+          "ordinal": 1,
           "type_info": "Text"
         },
         {
-          "ordinal": 2,
           "name": "name",
+          "ordinal": 2,
           "type_info": "Text"
         },
         {
-          "ordinal": 3,
           "name": "scopes",
+          "ordinal": 3,
           "type_info": "TextArray"
         },
         {
-          "ordinal": 4,
           "name": "access_token",
+          "ordinal": 4,
           "type_info": "Text"
         },
         {
-          "ordinal": 5,
           "name": "access_nonce",
+          "ordinal": 5,
           "type_info": "Text"
         },
         {
-          "ordinal": 6,
           "name": "refresh_token",
+          "ordinal": 6,
           "type_info": "Text"
         },
         {
-          "ordinal": 7,
           "name": "refresh_nonce",
+          "ordinal": 7,
           "type_info": "Text"
         },
         {
-          "ordinal": 8,
           "name": "access_expires",
+          "ordinal": 8,
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
           "name": "auth_token",
+          "ordinal": 9,
           "type_info": "Text"
         },
         {
-          "ordinal": 10,
           "name": "created",
+          "ordinal": 10,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 11,
           "name": "modified",
+          "ordinal": 11,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 12,
           "name": "last_known_listen",
+          "ordinal": 12,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 13,
           "name": "last_poll",
+          "ordinal": 13,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 14,
           "name": "revoked",
+          "ordinal": 14,
           "type_info": "Bool"
         }
       ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
       "nullable": [
         false,
         false,
@@ -128,100 +122,122 @@
         true,
         true,
         false
-      ]
-    }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                select u.*\n                from spot.users u\n                    inner join spot.auth_tokens at\n                    on u.id = at.user_id\n                where hash = $1 and expires > now()\n                "
   },
   "1ad83dbbba9b0e42dff46cd5c01aecdce6713718d5f116c0e8d298560a54f553": {
-    "query": "delete from spot.auth_tokens where user_id = $1 and expires <= now()",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Int8"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "delete from spot.auth_tokens where user_id = $1 and expires <= now()"
   },
   "21f9b6bb08cbc944d91697e04ed234345b2d548fb72814e777540b60ab038d0a": {
-    "query": "\n        update spot.users set access_token = $1, access_nonce = $2, access_expires = $3, modified = now() where id = $4 returning *\n        ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "email",
+          "ordinal": 1,
           "type_info": "Text"
         },
         {
-          "ordinal": 2,
           "name": "name",
+          "ordinal": 2,
           "type_info": "Text"
         },
         {
-          "ordinal": 3,
           "name": "scopes",
+          "ordinal": 3,
           "type_info": "TextArray"
         },
         {
-          "ordinal": 4,
           "name": "access_token",
+          "ordinal": 4,
           "type_info": "Text"
         },
         {
-          "ordinal": 5,
           "name": "access_nonce",
+          "ordinal": 5,
           "type_info": "Text"
         },
         {
-          "ordinal": 6,
           "name": "refresh_token",
+          "ordinal": 6,
           "type_info": "Text"
         },
         {
-          "ordinal": 7,
           "name": "refresh_nonce",
+          "ordinal": 7,
           "type_info": "Text"
         },
         {
-          "ordinal": 8,
           "name": "access_expires",
+          "ordinal": 8,
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
           "name": "auth_token",
+          "ordinal": 9,
           "type_info": "Text"
         },
         {
-          "ordinal": 10,
           "name": "created",
+          "ordinal": 10,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 11,
           "name": "modified",
+          "ordinal": 11,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 12,
           "name": "last_known_listen",
+          "ordinal": 12,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 13,
           "name": "last_poll",
+          "ordinal": 13,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 14,
           "name": "revoked",
+          "ordinal": 14,
           "type_info": "Bool"
         }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
       ],
       "parameters": {
         "Left": [
@@ -230,86 +246,64 @@
           "Int8",
           "Int8"
         ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false
-      ]
-    }
+      }
+    },
+    "query": "\n        update spot.users set access_token = $1, access_nonce = $2, access_expires = $3, modified = now() where id = $4 returning *\n        "
   },
   "379b474cc9977f97dd8726afd9d0e9582362e6cbf8aa60e16613c23b72afd9af": {
-    "query": "\n            select * from spot.plays where user_id = $1\n            order by played_at desc\n            limit 1\n            ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "user_id",
+          "ordinal": 1,
           "type_info": "Int8"
         },
         {
-          "ordinal": 2,
           "name": "spotify_id",
+          "ordinal": 2,
           "type_info": "Text"
         },
         {
-          "ordinal": 3,
           "name": "played_at",
+          "ordinal": 3,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 4,
           "name": "played_at_minute",
+          "ordinal": 4,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 5,
           "name": "name",
+          "ordinal": 5,
           "type_info": "Text"
         },
         {
-          "ordinal": 6,
           "name": "created",
+          "ordinal": 6,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 7,
           "name": "modified",
+          "ordinal": 7,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 8,
           "name": "artist_names",
+          "ordinal": 8,
           "type_info": "TextArray"
         },
         {
-          "ordinal": 9,
           "name": "last_known_listen",
+          "ordinal": 9,
           "type_info": "Timestamptz"
         }
       ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
       "nullable": [
         false,
         false,
@@ -321,95 +315,94 @@
         false,
         false,
         true
-      ]
-    }
-  },
-  "5335d7f920181b1ef38a30a15010f1a0833b97ad1e53a603f28cd7f50b93bace": {
-    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n            and revoked is false\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "scopes",
-          "type_info": "TextArray"
-        },
-        {
-          "ordinal": 4,
-          "name": "access_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "access_nonce",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "refresh_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "refresh_nonce",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 8,
-          "name": "access_expires",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 9,
-          "name": "auth_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 10,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 11,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 12,
-          "name": "last_known_listen",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 13,
-          "name": "last_poll",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 14,
-          "name": "revoked",
-          "type_info": "Bool"
-        }
       ],
       "parameters": {
         "Left": [
-          "Timestamptz",
-          "Timestamptz"
+          "Int8"
         ]
-      },
+      }
+    },
+    "query": "\n            select * from spot.plays where user_id = $1\n            order by played_at desc\n            limit 1\n            "
+  },
+  "66206597205a7dc14357cd3e6cd0cc052fffd22e5048f0aab73aa98aae551459": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "email",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "name",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "scopes",
+          "ordinal": 3,
+          "type_info": "TextArray"
+        },
+        {
+          "name": "access_token",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "access_nonce",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "refresh_token",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "refresh_nonce",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "access_expires",
+          "ordinal": 8,
+          "type_info": "Int8"
+        },
+        {
+          "name": "auth_token",
+          "ordinal": 9,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 10,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "modified",
+          "ordinal": 11,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "last_known_listen",
+          "ordinal": 12,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "last_poll",
+          "ordinal": 13,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "revoked",
+          "ordinal": 14,
+          "type_info": "Bool"
+        }
+      ],
       "nullable": [
         false,
         false,
@@ -426,28 +419,39 @@
         true,
         true,
         false
-      ]
-    }
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      }
+    },
+    "query": "\n        select * from spot.users\n        where\n            revoked is false\n            -- hack for now, only poll me\n            and email = 'james@kominick.com'\n            and (\n                (last_known_listen >= $1 and last_poll < $2)\n                or last_known_listen is null\n                or last_poll is null\n            )\n        "
   },
   "66d153501ce8b3b5249e7a25bab8f7468c67ae855356d1fbeced65b4aa24414f": {
-    "query": "\n                insert into spot.plays\n                (user_id, spotify_id, played_at, played_at_minute, name, artist_names)\n                values\n                ($1, $2, $3, $4, $5, $6)\n                on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                returning id, created, modified\n                ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "created",
+          "ordinal": 1,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 2,
           "name": "modified",
+          "ordinal": 2,
           "type_info": "Timestamptz"
         }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
       ],
       "parameters": {
         "Left": [
@@ -458,93 +462,105 @@
           "Text",
           "TextArray"
         ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
+      }
+    },
+    "query": "\n                insert into spot.plays\n                (user_id, spotify_id, played_at, played_at_minute, name, artist_names)\n                values\n                ($1, $2, $3, $4, $5, $6)\n                on conflict (user_id, spotify_id, played_at_minute) do update set modified = now()\n                returning id, created, modified\n                "
   },
   "719167a14d2e815019fd9ca3a8da3cc8763deb112ad9914cdbb051c97c7d342b": {
-    "query": "\n        insert into\n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        )\n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes,\n        access_token = excluded.access_token, access_nonce = excluded.access_nonce,\n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce,\n        access_expires = excluded.access_expires, auth_token = excluded.auth_token,\n        modified = now(), revoked = false\n        returning *\n        ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "email",
+          "ordinal": 1,
           "type_info": "Text"
         },
         {
-          "ordinal": 2,
           "name": "name",
+          "ordinal": 2,
           "type_info": "Text"
         },
         {
-          "ordinal": 3,
           "name": "scopes",
+          "ordinal": 3,
           "type_info": "TextArray"
         },
         {
-          "ordinal": 4,
           "name": "access_token",
+          "ordinal": 4,
           "type_info": "Text"
         },
         {
-          "ordinal": 5,
           "name": "access_nonce",
+          "ordinal": 5,
           "type_info": "Text"
         },
         {
-          "ordinal": 6,
           "name": "refresh_token",
+          "ordinal": 6,
           "type_info": "Text"
         },
         {
-          "ordinal": 7,
           "name": "refresh_nonce",
+          "ordinal": 7,
           "type_info": "Text"
         },
         {
-          "ordinal": 8,
           "name": "access_expires",
+          "ordinal": 8,
           "type_info": "Int8"
         },
         {
-          "ordinal": 9,
           "name": "auth_token",
+          "ordinal": 9,
           "type_info": "Text"
         },
         {
-          "ordinal": 10,
           "name": "created",
+          "ordinal": 10,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 11,
           "name": "modified",
+          "ordinal": 11,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 12,
           "name": "last_known_listen",
+          "ordinal": 12,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 13,
           "name": "last_poll",
+          "ordinal": 13,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 14,
           "name": "revoked",
+          "ordinal": 14,
           "type_info": "Bool"
         }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
       ],
       "parameters": {
         "Left": [
@@ -558,87 +574,64 @@
           "Int8",
           "Text"
         ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false
-      ]
-    }
+      }
+    },
+    "query": "\n        insert into\n        spot.users (\n            email, name, scopes,\n            access_token, access_nonce,\n            refresh_token, refresh_nonce,\n            access_expires,\n            auth_token\n        )\n        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        on conflict (email) do update set name = excluded.name, scopes = excluded.scopes,\n        access_token = excluded.access_token, access_nonce = excluded.access_nonce,\n        refresh_token = excluded.refresh_token, refresh_nonce = excluded.refresh_nonce,\n        access_expires = excluded.access_expires, auth_token = excluded.auth_token,\n        modified = now(), revoked = false\n        returning *\n        "
   },
   "736e89a4dd0ddf3eb4fcd5c485973377e9b9f0bcae679b5c091d1f02f093d916": {
-    "query": "\n        select *\n        from spot.plays\n        where user_id = $1\n            and played_at > $2\n        order by played_at desc\n        ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "user_id",
+          "ordinal": 1,
           "type_info": "Int8"
         },
         {
-          "ordinal": 2,
           "name": "spotify_id",
+          "ordinal": 2,
           "type_info": "Text"
         },
         {
-          "ordinal": 3,
           "name": "played_at",
+          "ordinal": 3,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 4,
           "name": "played_at_minute",
+          "ordinal": 4,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 5,
           "name": "name",
+          "ordinal": 5,
           "type_info": "Text"
         },
         {
-          "ordinal": 6,
           "name": "created",
+          "ordinal": 6,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 7,
           "name": "modified",
+          "ordinal": 7,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 8,
           "name": "artist_names",
+          "ordinal": 8,
           "type_info": "TextArray"
         },
         {
-          "ordinal": 9,
           "name": "last_known_listen",
+          "ordinal": 9,
           "type_info": "Timestamptz"
         }
       ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Timestamptz"
-        ]
-      },
       "nullable": [
         false,
         false,
@@ -650,115 +643,116 @@
         false,
         false,
         true
-      ]
-    }
-  },
-  "73e89f9b230e1435671f5d1839240ae490dab6988427cc3a95f0801289fa1df5": {
-    "query": "\n                update spot.plays\n                    set modified = now(),\n                        last_known_listen = now()\n                    where id = $1\n                ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "76c9d89ba494f065aa59ab3ac197f92d313cf79dcabde2e73e55aec4e8bce1c0": {
-    "query": "\n        update spot.users\n            set revoked = true\n            where id = $1\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "a3fa5d77ddd470e35e7e4d1ba864c365077fda7afa3a69a8cb96f1cbe0fa13b3": {
-    "query": "\n        select played_at::date as date, count(*)\n            from spot.plays\n        where user_id = $1\n            and played_at > $2\n        group by played_at::date\n        order by played_at::date desc\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "date",
-          "type_info": "Date"
-        },
-        {
-          "ordinal": 1,
-          "name": "count",
-          "type_info": "Int8"
-        }
       ],
       "parameters": {
         "Left": [
           "Int8",
           "Timestamptz"
         ]
-      },
-      "nullable": [
-        null,
-        null
-      ]
-    }
+      }
+    },
+    "query": "\n        select *\n        from spot.plays\n        where user_id = $1\n            and played_at > $2\n        order by played_at desc\n        "
   },
-  "ac28a4ff0fdc7ed586ecf2f1c1f1c6857b6efc037801cc6fb0325b9da184abc6": {
-    "query": "\n        select\n            distinct on(u.id) u.id as user_id,\n            u.name as user_name,\n            p.id as play_id,\n            p.played_at,\n            p.played_at_minute,\n            p.name as track_name,\n            p.artist_names as track_artist_names,\n            p.last_known_listen,\n            extract(epoch from(now() - p.last_known_listen)) < 60 as is_listening\n        from spot.users u inner join spot.plays p on u.id = p.user_id\n        where u.id = $1\n        order by u.id, p.played_at desc, p.id\n        ",
+  "73e89f9b230e1435671f5d1839240ae490dab6988427cc3a95f0801289fa1df5": {
     "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "user_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "user_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "play_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "played_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 4,
-          "name": "played_at_minute",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "track_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "track_artist_names",
-          "type_info": "TextArray"
-        },
-        {
-          "ordinal": 7,
-          "name": "last_known_listen",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 8,
-          "name": "is_listening",
-          "type_info": "Bool"
-        }
-      ],
+      "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Int8"
         ]
-      },
+      }
+    },
+    "query": "\n                update spot.plays\n                    set modified = now(),\n                        last_known_listen = now()\n                    where id = $1\n                "
+  },
+  "76c9d89ba494f065aa59ab3ac197f92d313cf79dcabde2e73e55aec4e8bce1c0": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n        update spot.users\n            set revoked = true\n            where id = $1\n        "
+  },
+  "a3fa5d77ddd470e35e7e4d1ba864c365077fda7afa3a69a8cb96f1cbe0fa13b3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "date",
+          "ordinal": 0,
+          "type_info": "Date"
+        },
+        {
+          "name": "count",
+          "ordinal": 1,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Timestamptz"
+        ]
+      }
+    },
+    "query": "\n        select played_at::date as date, count(*)\n            from spot.plays\n        where user_id = $1\n            and played_at > $2\n        group by played_at::date\n        order by played_at::date desc\n        "
+  },
+  "ac28a4ff0fdc7ed586ecf2f1c1f1c6857b6efc037801cc6fb0325b9da184abc6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "user_name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "play_id",
+          "ordinal": 2,
+          "type_info": "Int8"
+        },
+        {
+          "name": "played_at",
+          "ordinal": 3,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "played_at_minute",
+          "ordinal": 4,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "track_name",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "track_artist_names",
+          "ordinal": 6,
+          "type_info": "TextArray"
+        },
+        {
+          "name": "last_known_listen",
+          "ordinal": 7,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "is_listening",
+          "ordinal": 8,
+          "type_info": "Bool"
+        }
+      ],
       "nullable": [
         false,
         false,
@@ -769,107 +763,132 @@
         false,
         true,
         null
-      ]
-    }
-  },
-  "b4fad77dd32d6122f152c4be28055a57539bc5414aefecacd85ad6fc7e159b05": {
-    "query": "\n            update spot.users\n                set last_poll = now(), modified = now()\n                where id = $1\n            ",
-    "describe": {
-      "columns": [],
+      ],
       "parameters": {
         "Left": [
           "Int8"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n        select\n            distinct on(u.id) u.id as user_id,\n            u.name as user_name,\n            p.id as play_id,\n            p.played_at,\n            p.played_at_minute,\n            p.name as track_name,\n            p.artist_names as track_artist_names,\n            p.last_known_listen,\n            extract(epoch from(now() - p.last_known_listen)) < 60 as is_listening\n        from spot.users u inner join spot.plays p on u.id = p.user_id\n        where u.id = $1\n        order by u.id, p.played_at desc, p.id\n        "
   },
-  "b7e7a92c395eadb8849c33bf539422494f93b9e45bde8c189813b958d55cf88e": {
-    "query": "\n        select * from spot.users\n        where\n            revoked is false\n            and (\n                (last_known_listen >= $1 and last_poll < $2)\n                or last_known_listen is null\n                or last_poll is null\n            )\n        ",
+  "b4fad77dd32d6122f152c4be28055a57539bc5414aefecacd85ad6fc7e159b05": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            update spot.users\n                set last_poll = now(), modified = now()\n                where id = $1\n            "
+  },
+  "bd49137dd6ce669af96145d71f1c74d4bba756d3caf8b35e0aae270c9889b465": {
     "describe": {
       "columns": [
         {
+          "name": "artist_names",
           "ordinal": 0,
-          "name": "id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "scopes",
           "type_info": "TextArray"
         },
         {
-          "ordinal": 4,
-          "name": "access_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 5,
-          "name": "access_nonce",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 6,
-          "name": "refresh_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 7,
-          "name": "refresh_nonce",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 8,
-          "name": "access_expires",
+          "name": "count",
+          "ordinal": 1,
           "type_info": "Int8"
-        },
-        {
-          "ordinal": 9,
-          "name": "auth_token",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 10,
-          "name": "created",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 11,
-          "name": "modified",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 12,
-          "name": "last_known_listen",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 13,
-          "name": "last_poll",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 14,
-          "name": "revoked",
-          "type_info": "Bool"
         }
+      ],
+      "nullable": [
+        false,
+        null
       ],
       "parameters": {
         "Left": [
-          "Timestamptz",
-          "Timestamptz"
+          "Int8"
         ]
-      },
+      }
+    },
+    "query": "\n        with src as (\n            select artist_names, count(*)\n            from spot.plays\n            where user_id = $1\n            group by artist_names\n        )\n        select artist_names, count\n        from src\n        order by count desc\n        limit 10\n        "
+  },
+  "c7ccbcb02ceabca2a730ec438cff1e26209955134d225516b5b57020cab44cff": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "email",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "name",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "scopes",
+          "ordinal": 3,
+          "type_info": "TextArray"
+        },
+        {
+          "name": "access_token",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "access_nonce",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "refresh_token",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "refresh_nonce",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "access_expires",
+          "ordinal": 8,
+          "type_info": "Int8"
+        },
+        {
+          "name": "auth_token",
+          "ordinal": 9,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 10,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "modified",
+          "ordinal": 11,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "last_known_listen",
+          "ordinal": 12,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "last_poll",
+          "ordinal": 13,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "revoked",
+          "ordinal": 14,
+          "type_info": "Bool"
+        }
+      ],
       "nullable": [
         false,
         false,
@@ -886,66 +905,51 @@
         true,
         true,
         false
-      ]
-    }
-  },
-  "bd49137dd6ce669af96145d71f1c74d4bba756d3caf8b35e0aae270c9889b465": {
-    "query": "\n        with src as (\n            select artist_names, count(*)\n            from spot.plays\n            where user_id = $1\n            group by artist_names\n        )\n        select artist_names, count\n        from src\n        order by count desc\n        limit 10\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "artist_names",
-          "type_info": "TextArray"
-        },
-        {
-          "ordinal": 1,
-          "name": "count",
-          "type_info": "Int8"
-        }
       ],
       "parameters": {
         "Left": [
-          "Int8"
+          "Timestamptz",
+          "Timestamptz"
         ]
-      },
-      "nullable": [
-        false,
-        null
-      ]
-    }
+      }
+    },
+    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n            and revoked is false\n            -- hack for now, only poll me\n            and email = 'james@kominick.com'\n        "
   },
   "eb5f3766a684ed1aa7c9cc83d5aff849b26e865a61c5da04ab79f6a1c7c361cd": {
-    "query": "\n            update spot.users\n                set last_known_listen = now()\n                where id = $1\n            ",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Int8"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n            update spot.users\n                set last_known_listen = now()\n                where id = $1\n            "
   },
   "ef3f8442850134c61c710e1ad0ff23c838f3730e2449d7abda72961100f9e72f": {
-    "query": "\n                insert into spot.plays\n                (user_id, spotify_id, played_at, played_at_minute, name, artist_names, last_known_listen)\n                values\n                ($1, $2, $3, $4, $5, $6, now())\n                on conflict (user_id, spotify_id, played_at_minute)\n                do update set modified = now(), last_known_listen = excluded.last_known_listen\n                returning id, created, modified\n                ",
     "describe": {
       "columns": [
         {
-          "ordinal": 0,
           "name": "id",
+          "ordinal": 0,
           "type_info": "Int8"
         },
         {
-          "ordinal": 1,
           "name": "created",
+          "ordinal": 1,
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 2,
           "name": "modified",
+          "ordinal": 2,
           "type_info": "Timestamptz"
         }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
       ],
       "parameters": {
         "Left": [
@@ -956,32 +960,28 @@
           "Text",
           "TextArray"
         ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
+      }
+    },
+    "query": "\n                insert into spot.plays\n                (user_id, spotify_id, played_at, played_at_minute, name, artist_names, last_known_listen)\n                values\n                ($1, $2, $3, $4, $5, $6, now())\n                on conflict (user_id, spotify_id, played_at_minute)\n                do update set modified = now(), last_known_listen = excluded.last_known_listen\n                returning id, created, modified\n                "
   },
   "f85f1b9ad0ea81d7c02b867d0d373fa1d97c6628b5872904f31522ee99974f13": {
-    "query": "\n        insert into\n        spot.auth_tokens (\n            hash, user_id, expires\n        )\n        values ($1, $2, $3)\n        ",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Text",
           "Int8",
           "Timestamptz"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n        insert into\n        spot.auth_tokens (\n            hash, user_id, expires\n        )\n        values ($1, $2, $3)\n        "
   },
   "fb5a11a471a196dd67c8564ecc90dd58a5ac4522b1ed5e88581fbdd638e00be8": {
-    "query": "\n                insert into spot.tracks\n                (spotify_id, name, artist_names, artist_ids, album_name, album_id, album_images)\n                values\n                ($1, $2, $3, $4, $5, $6, $7)\n                on conflict (spotify_id) do update set\n                name = excluded.name, artist_names = excluded.artist_names,\n                artist_ids = excluded.artist_ids,\n                album_name = excluded.album_name, album_id = excluded.album_id,\n                album_images = excluded.album_images,\n                modified = now()\n                ",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Text",
@@ -992,8 +992,8 @@
           "Text",
           "Jsonb"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n                insert into spot.tracks\n                (spotify_id, name, artist_names, artist_ids, album_name, album_id, album_images)\n                values\n                ($1, $2, $3, $4, $5, $6, $7)\n                on conflict (spotify_id) do update set\n                name = excluded.name, artist_names = excluded.artist_names,\n                artist_ids = excluded.artist_ids,\n                album_name = excluded.album_name, album_id = excluded.album_id,\n                album_images = excluded.album_images,\n                modified = now()\n                "
   }
 }

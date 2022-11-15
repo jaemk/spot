@@ -5,6 +5,22 @@ use sqlx::PgPool;
 use crate::{crypto, models, resp, se, spotify, utils, Result, CONFIG, LOG};
 use std::collections::HashMap;
 
+macro_rules! user_or_redirect {
+    ($req:expr) => {{
+        let user = get_auth_user(&$req).await;
+        if user.is_none() {
+            let path = $req.url().path();
+            return Ok(tide::Redirect::new(format!(
+                "{}/login?redirect={}",
+                CONFIG.redirect_host(),
+                path
+            ))
+            .into());
+        }
+        user.unwrap()
+    }};
+}
+
 #[derive(Clone)]
 struct Context {
     pool: sqlx::PgPool,
@@ -37,11 +53,11 @@ pub async fn start(pool: sqlx::PgPool) -> crate::Result<()> {
     Ok(())
 }
 
-async fn index(_req: tide::Request<Context>) -> tide::Result {
-    slog::info!(LOG, "index redirecting to /recent");
-    let resp: tide::Response =
-        tide::Redirect::new(format!("{}/recent", CONFIG.redirect_host())).into();
-    Ok(resp)
+async fn index(req: tide::Request<Context>) -> tide::Result {
+    let _ = user_or_redirect!(req);
+    let mut res = tide::Response::new(tide::StatusCode::Ok);
+    res.set_body(tide::Body::from_file("static/index.html").await?);
+    Ok(res)
 }
 
 #[derive(serde::Serialize)]
@@ -75,7 +91,7 @@ async fn login(req: tide::Request<Context>) -> tide::Result {
         format!("https://accounts.spotify.com/authorize?client_id={id}&response_type=code&redirect_uri={redirect}&scope={scope}&state={state}",
                 id = CONFIG.spotify_client_id,
                 redirect = CONFIG.spotify_redirect_url(),
-                scope = "user-read-private user-read-email user-read-recently-played user-read-currently-playing",
+                scope = "user-read-private user-read-email user-read-recently-played user-read-currently-playing user-read-playback-state user-modify-playback-state streaming",
                 state = token)
     ).into())
 }
@@ -163,22 +179,6 @@ async fn auth_callback(req: tide::Request<Context>) -> tide::Result {
         .build())
 }
 
-macro_rules! user_or_redirect {
-    ($req:expr) => {{
-        let user = get_auth_user(&$req).await;
-        if user.is_none() {
-            let path = $req.url().path();
-            return Ok(tide::Redirect::new(format!(
-                "{}/login?redirect={}",
-                CONFIG.redirect_host(),
-                path
-            ))
-            .into());
-        }
-        user.unwrap()
-    }};
-}
-
 #[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CurrentUser {
     pub user_id: i64,
@@ -225,7 +225,6 @@ async fn current_user(req: tide::Request<Context>) -> tide::Result {
     Ok(resp!(json => CurrentUserResponse { user: current }))
 }
 
-
 #[derive(serde::Serialize)]
 struct AuthTokenResponse {
     token: String,
@@ -234,7 +233,8 @@ struct AuthTokenResponse {
 async fn auth_token(req: tide::Request<Context>) -> tide::Result {
     let user = user_or_redirect!(req);
     let ctx = req.state();
-    let token = spotify::get_user_access_token(&ctx.pool, &user).await
+    let token = spotify::get_user_access_token(&ctx.pool, &user)
+        .await
         .map_err(|e| se!("error fetching access token {:?}", e))?;
     Ok(resp!(json => AuthTokenResponse { token }))
 }
@@ -393,7 +393,7 @@ struct OneTimeLoginToken {
 
 async fn new_one_time_login_token(redirect: Option<String>) -> Result<String> {
     let s = uuid::Uuid::new_v4()
-        .to_simple()
+        .simple()
         .encode_lower(&mut uuid::Uuid::encode_buffer())
         .to_string();
     let s = serde_json::to_string(&OneTimeLoginToken { token: s, redirect })
@@ -416,7 +416,7 @@ struct MaybeRedirect {
 
 fn get_new_auth_token(email: &str) -> String {
     let s = uuid::Uuid::new_v4()
-        .to_simple()
+        .simple()
         .encode_lower(&mut uuid::Uuid::encode_buffer())
         .to_string();
     let s = format!("{}:{}", email, s);
@@ -954,6 +954,8 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         select * from spot.users
         where
             revoked is false
+            -- hack for now, only poll me
+            and email = 'james@kominick.com'
             and (
                 (last_known_listen >= $1 and last_poll < $2)
                 or last_known_listen is null
@@ -976,6 +978,8 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         where last_known_listen < $1
             and last_poll < $2
             and revoked is false
+            -- hack for now, only poll me
+            and email = 'james@kominick.com'
         ",
         &two_minutes_ago,
         &thirty_seconds_ago,
