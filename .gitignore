@@ -1,4 +1,5 @@
 **/target
 **/.env
+**/.env.docker
 .idea/
-bin/server
+bin/spot

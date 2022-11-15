@@ -24,23 +24,22 @@ while getopts "bh" opt; do
 done
 
 if $BUILD; then
-  (cd server; cargo build)
-  cp server/target/debug/server bin/server
-  echo "built the server"
+  cargo build
+  cp target/debug/spot bin/spot
+  echo "build complete"
 fi
 
-if [[ ! -f bin/server ]]; then
-  echo "missing bin/server executable"
+if [[ ! -f bin/spot ]]; then
+  echo "missing bin/spot executable"
   exit 1
 fi
 
 if [[ -f /etc/secrets/.env ]]; then
   echo "copying /etc/secrets/.env to .env"
   cp /etc/secrets/.env .env
-  cp /etc/secrets/.env server/.env
 fi
 
-(cd server/ && migrant list)
-(cd server/ && migrant apply -a || true)
+migrant list
+migrant apply -a || true
 
-./bin/server
+./bin/spot

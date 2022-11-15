@@ -21,6 +21,8 @@ pub async fn start(pool: sqlx::PgPool) -> crate::Result<()> {
     app.at("/top").get(user_top);
     app.at("/recent").get(recent);
     app.at("/summary").get(summary);
+
+    app.at("/api/token").get(auth_token);
     app.at("/api/status").get(status);
     app.at("/api/login").get(login);
     app.at("/api/auth").get(auth_callback);
@@ -221,6 +223,20 @@ async fn current_user(req: tide::Request<Context>) -> tide::Result {
     .await
     .map_err(|e| se!("error fetching current user {:?}", e))?;
     Ok(resp!(json => CurrentUserResponse { user: current }))
+}
+
+
+#[derive(serde::Serialize)]
+struct AuthTokenResponse {
+    token: String,
+}
+
+async fn auth_token(req: tide::Request<Context>) -> tide::Result {
+    let user = user_or_redirect!(req);
+    let ctx = req.state();
+    let token = spotify::get_user_access_token(&ctx.pool, &user).await
+        .map_err(|e| se!("error fetching access token {:?}", e))?;
+    Ok(resp!(json => AuthTokenResponse { token }))
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize, serde::Deserialize)]
