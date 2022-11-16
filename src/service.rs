@@ -30,6 +30,7 @@ pub async fn start(pool: sqlx::PgPool) -> crate::Result<()> {
     let ctx = Context { pool };
     let mut app = tide::with_state(ctx);
     app.at("/").get(index);
+    app.at("/favicon.ico").get(favicon);
     app.at("/status").get(status);
     app.at("/login").get(login);
     app.at("/auth").get(auth_callback);
@@ -57,6 +58,12 @@ async fn index(req: tide::Request<Context>) -> tide::Result {
     let _ = user_or_redirect!(req);
     let mut res = tide::Response::new(tide::StatusCode::Ok);
     res.set_body(tide::Body::from_file("static/index.html").await?);
+    Ok(res)
+}
+
+async fn favicon(_req: tide::Request<Context>) -> tide::Result {
+    let mut res = tide::Response::new(tide::StatusCode::Ok);
+    res.set_body(tide::Body::from_file("static/favicon.ico").await?);
     Ok(res)
 }
 
