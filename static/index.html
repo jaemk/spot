@@ -15,12 +15,14 @@
 <br/>
 <br/>
 
+<button id="refresh">refresh</button>
+<br/>
+<br/>
+
+<button id="seek-back-5"><< seek back 5s</button>
 <button id="pause">pause</button>
 <button id="play">play</button>
-<br/>
-<button id="seek">seek</button>
-<label for="seek-to">Seek to seconds:</label>
-<input type="number" id="seek-to" name="seek to seconds" min="0">
+<button id="seek-fwd-5">seek forward 5s >></button>
 
 <br/>
 <br/>
@@ -35,6 +37,7 @@
 <br/>
 <button id="loop-start">start looping</button>
 <button id="loop-stop">end looping</button>
+<button id="set-loop-start">set start to now</button>
 <br/>
 <label for="loop-head">Loop start seconds:</label>
 <input type="number" id="loop-head" name="loop start seconds" min="0">
@@ -66,101 +69,239 @@
     let looping = false;
     const maxLoops = 10;
     let loopCount = 0;
+    let loopId = crypto.randomUUID();
+
+    let trackSeconds = 0;
+    let trackTotal = 0;
+    let trackTitle = "";
+    let trackArtists = "";
 
     const isLoopingPrefix = "is looping:";
     const loopsRemainingPrefix = "loops remaining:";
     const currentlyPlayingPrefix = "currently playing:";
 
-    document.addEventListener("DOMContentLoaded", () => {
+    const setInfo = (_seconds, _total, _track, _artists) => {
+        let seconds = _seconds || trackSeconds;
+        let total = _total || trackTotal;
+        let track = _track || trackTitle;
+        let artists = _artists || trackArtists;
+        document.getElementById("current-track").innerHTML = `${currentlyPlayingPrefix} ${track} by ${artists}, position: ${seconds}s / ${total}s`;
+    }
+
+    const getPlaying = (token, after) => {
+        request({
+            method: 'GET',
+            uri: 'https://api.spotify.com/v1/me/player/currently-playing',
+            headers: {'Authorization': `Bearer ${token}`},
+            callback: (resp) => {
+                if (!resp) { return; }
+                const data = JSON.parse(resp);
+                const seconds = Math.trunc(data.progress_ms / 1000);
+                trackSeconds = seconds;
+
+                if (!data.item) { return; }
+                const total = Math.trunc(data.item.duration_ms / 1000);
+                const track = data.item.name;
+                let artists = "";
+                for (artist of data.item.artists) {
+                    if (artists) {
+                        artists += ` & ${artist.name}`;
+                    } else {
+                        artists = artist.name;
+                    }
+                }
+                console.log(`currently playing ${track} by ${artists}, position: ${seconds}s`);
+                trackTotal = total;
+                trackTitle = track;
+                trackArtists = artists;
+                setInfo(seconds, total, track, artists);
+                if (after) {
+                    after({seconds, track, artists, total});
+                }
+            }
+        })
+    }
+
+    const getDevices = (token, after) => {
+        request({
+            method: 'GET', uri: 'https://api.spotify.com/v1/me/player/devices',
+            headers: {'Authorization': `Bearer ${token}`},
+            callback: (resp) => {
+                const devices = JSON.parse(resp).devices;
+                for (d of devices) {
+                    if (d.is_active) {
+                        device = d;
+                        break;
+                    }
+                }
+                if (device) {
+                    console.log(`listening on device ${device.id} ${device.name}`);
+                    document.getElementById("connected-device").innerHTML = `Listening on device: ${device.name}`;
+                } else {
+                    console.log("no devices found");
+                    document.getElementById("connected-device").innerHTML = `No listening on device found`;
+                    return;
+                }
+                if (after) {
+                    after(device);
+                }
+            }
+        });
+    }
+
+    const getToken = (after) => {
         request({
             method: 'GET',
             uri: '/api/token',
             callback: (resp) => {
                 const data = JSON.parse(resp);
                 token = data.token;
-                request({
-                    method: 'GET', uri: 'https://api.spotify.com/v1/me/player/devices',
-                    headers: {'Authorization': `Bearer ${token}`},
-                    callback: (resp) => {
-                        console.log(resp);
-                        const devices = JSON.parse(resp).devices;
-                        for (d of devices) {
-                            if (d.is_active) {
-                                device = d;
-                                break;
-                            }
-                        }
-                        if (device) {
-                            console.log("listening on device", device);
-                            document.getElementById("connected-device").innerHTML = `Listening on device: ${device.name}`;
-                        } else {
-                            console.log("no devices found");
-                            document.getElementById("connected-device").innerHTML = `No listening on device found`;
-                            return;
-                        }
-                        request({
-                            method: 'GET',
-                            uri: 'https://api.spotify.com/v1/me/player/currently-playing',
-                            headers: {'Authorization': `Bearer ${token}`},
-                            callback: (resp) => {
-                                const data = JSON.parse(resp);
-                                const seconds = data.progress_ms / 1000;
-                                const track = data.item.name;
-                                let artists = "";
-                                for (artist of data.item.artists) {
-                                    if (artists) {
-                                        artists += ` & ${artist.name}`;
-                                    } else {
-                                        artists = artist.name;
-                                    }
-                                }
-                                console.log(`currently playing ${track} by ${artists}, position: ${seconds}s`);
-                                document.getElementById("current-track").innerHTML = `${currentlyPlayingPrefix} ${track} by ${artists}, position: ${seconds}s`;
-                            }
-                        })
-                    }
-                });
+                if (after) {
+                    after(token);
+                }
+            }
+        });
+    }
+
+    let interval = null;
+    document.addEventListener("DOMContentLoaded", () => {
+        const refresh = () => {
+            getToken((token) => {
+                getPlaying(token)
+            });
+        };
+
+        let lastRefresh = 0;
+        const debouncedRefresh = () => {
+            const now = Date.now()
+            const diff = now - lastRefresh;
+            if (diff >= 5000) {
+                refresh();
+                lastRefresh = now;
+            }
+        }
+
+        interval = setInterval(() => {
+            debouncedRefresh();
+        }, 5000);
+
+        document.addEventListener("visibilitychange", () => {
+            if (interval) {
+                clearInterval(interval);
+            }
+            if (document.hidden) {
+                console.log("tab inactive, stopping poll");
+            } else {
+                console.log("tab active, resuming poll");
+                interval = setInterval(() => {
+                    debouncedRefresh();
+                }, 5000);
+                debouncedRefresh();
             }
         });
 
+        getToken((token) => {
+            getDevices(token, (device) => { if (!device) { return } getPlaying(token) });
+        })
+
+        document.getElementById("refresh").onclick = () => {
+            console.log(`refreshing token and status, device, and playback status`);
+            getToken(() => {
+                getDevices(token, (device) => { if (!device) { return } getPlaying(token) });
+            })
+        };
+
         document.getElementById("pause").onclick = () => {
-            console.log("pausing play on device", device.id, device.name);
+            if (!device) {
+                console.log("no current device");
+                return;
+            }
+            console.log(`pausing play on device ${device?.id}, and cancelling loop ${loopId}`);
+            looping = false;
+            document.getElementById("loop-remaining").innerHTML = `${loopsRemainingPrefix} ${maxLoops}`;
+            document.getElementById("loop-active").innerHTML = `${isLoopingPrefix} false`;
             request({
                 method: 'PUT',
                 uri: `https://api.spotify.com/v1/me/player/pause?device_id=${device.id}`,
                 headers: {'Authorization': `Bearer ${token}`},
-                callback: (resp) => {
+                callback: () => {
                     console.log("paused");
                 }
             });
         };
 
         document.getElementById("play").onclick = () => {
+            if (!device) {
+                console.log("no current device");
+                return;
+            }
             console.log("starting play on device", device.id, device.name);
             request({
                 method: 'PUT',
                 uri: `https://api.spotify.com/v1/me/player/play?device_id=${device.id}`,
                 headers: {'Authorization': `Bearer ${token}`},
-                callback: (resp) => {
+                callback: () => {
                     console.log("resumed");
                 }
             });
         };
 
-        document.getElementById("seek").onclick = () => {
-            const pos = document.getElementById("seek-to").value;
-            const ms = pos * 1000;
-            console.log(`seeking to ${pos} on device ${device.id}, ${device.name}`);
-            request({
-                method: 'PUT',
-                uri: `https://api.spotify.com/v1/me/player/seek?device_id=${device.id}&position_ms=${ms}`,
-                headers: {'Authorization': `Bearer ${token}`},
-                callback: (resp) => {
-                    console.log("seek complete");
-                }
-            });
+        document.getElementById("seek-back-5").onclick = () => {
+            if (!device) {
+                console.log("no current device");
+                return;
+            }
+            getPlaying(token, ({seconds}) => {
+                console.log(`seeking back 5s from ${seconds} on device ${device.id}, ${device.name}`);
+                const newSeconds = Math.max(0, seconds - 5);
+                const ms = newSeconds * 1000;
+                request({
+                    method: 'PUT',
+                    uri: `https://api.spotify.com/v1/me/player/seek?device_id=${device.id}&position_ms=${ms}`,
+                    headers: {'Authorization': `Bearer ${token}`},
+                    callback: () => {
+                        trackSeconds = newSeconds;
+                        setInfo();
+                        console.log("seek complete");
+                    }
+                });
+            })
+        };
+        document.getElementById("seek-fwd-5").onclick = () => {
+            if (!device) {
+                console.log("no current device");
+                return;
+            }
+            getPlaying(token, ({seconds, total}) => {
+                console.log(`seeking forward 5s from ${seconds} on device ${device.id}, ${device.name}`);
+                const newSeconds = Math.min(total, seconds + 5);
+                const ms = newSeconds * 1000;
+                request({
+                    method: 'PUT',
+                    uri: `https://api.spotify.com/v1/me/player/seek?device_id=${device.id}&position_ms=${ms}`,
+                    headers: {'Authorization': `Bearer ${token}`},
+                    callback: () => {
+                        trackSeconds = newSeconds;
+                        setInfo();
+                        console.log("seek complete");
+                    }
+                });
+            })
         };
 
+        document.getElementById("set-loop-start").onclick = () => {
+            if (!device) {
+                console.log("no current device");
+                return;
+            }
+            console.log("refreshing current song", device.id, device.name);
+            getDevices(token, (device) => {
+                if (!device) { return }
+                getPlaying(token, ({seconds}) => {
+                    document.getElementById("loop-head").value = Math.trunc(seconds);
+                });
+            });
+        };
 
         document.getElementById("loop-stop").onclick = () => {
             looping = false;
@@ -168,36 +309,30 @@
             document.getElementById("loop-active").innerHTML = `${isLoopingPrefix} false`;
         };
 
-        document.getElementById("loop-start").onclick = () => {
-            looping = true;
-            loopCount = 0;
-            const begin = document.getElementById("loop-head").value;
-            const seconds = document.getElementById("loop-dur").value;
-            if (!begin || !seconds) {
-                alert("must specify loop start and duration");
-            }
+        const doLoop = (thisLoopId, begin, seconds) => {
             const ms = begin * 1000;
-            console.log(`start looping from ${begin}s(${ms}ms) for ${seconds}s`)
-
             request({
                 method: 'PUT',
                 uri: `https://api.spotify.com/v1/me/player/seek?device_id=${device.id}&position_ms=${ms}`,
                 headers: {'Authorization': `Bearer ${token}`},
-                callback: (resp) => {
-                    console.log(`seek to start of loop: ${begin}s`);
+                callback: () => {
+                    console.log(`seeked to start of loop: ${begin}s`);
                     request({
                         method: 'PUT',
                         uri: `https://api.spotify.com/v1/me/player/play?device_id=${device.id}`,
                         headers: {'Authorization': `Bearer ${token}`},
-                        callback: (resp) => {
+                        callback: () => {
+                            trackSeconds = begin;
+                            setInfo();
+
                             console.log("resumed");
-                            console.log("first loop started");
+                            console.log(`loop initiated ${thisLoopId}`);
                             loopCount += 1;
                             document.getElementById("loop-remaining").innerHTML = `${loopsRemainingPrefix} ${maxLoops - loopCount}`;
                             document.getElementById("loop-active").innerHTML = `${isLoopingPrefix} true`;
-                            onloop = () => {
-                                console.log(`on loop ${loopCount}, remaining loops: ${maxLoops - loopCount}`);
-                                if (!looping) {
+                            onloop = (thisLoopId) => {
+                                console.log(`${thisLoopId} in loop ${loopCount}/${loopId}, remaining loops: ${maxLoops - loopCount}`);
+                                if (!looping || thisLoopId !== loopId) {
                                     console.log("looping cancelled");
                                     document.getElementById("loop-active").innerHTML = `${isLoopingPrefix} false`;
                                     document.getElementById("loop-remaining").innerHTML = `${loopsRemainingPrefix} ${maxLoops}`;
@@ -209,22 +344,45 @@
                                     console.log("hit max loops");
                                     looping = false;
                                     document.getElementById("loop-active").innerHTML = `${isLoopingPrefix} false`;
+                                    document.getElementById("loop-remaining").innerHTML = `${loopsRemainingPrefix} ${maxLoops}`;
                                 }
                                 request({
                                     method: 'PUT',
                                     uri: `https://api.spotify.com/v1/me/player/seek?device_id=${device.id}&position_ms=${ms}`,
                                     headers: {'Authorization': `Bearer ${token}`},
-                                    callback: (resp) => {
-                                        console.log("seek to loop start");
-                                        setTimeout(onloop, seconds * 1000);
+                                    callback: () => {
+                                        trackSeconds = begin;
+                                        setInfo();
+                                        console.log("seeked to loop start");
+                                        setTimeout(() => onloop(thisLoopId), seconds * 1000);
                                     }
                                 });
                             };
-                            setTimeout(onloop, seconds * 1000);
+                            setTimeout(() => onloop(thisLoopId), seconds * 1000);
                         }
                     });
                 }
             });
+        };
+
+        document.getElementById("loop-start").onclick = () => {
+            if (!device) {
+                console.log("no current device");
+                return;
+            }
+            looping = true;
+            loopCount = 0;
+            loopId = crypto.randomUUID();
+            thisLoopId = `${loopId}`;
+            const begin = document.getElementById("loop-head").value;
+            const seconds = document.getElementById("loop-dur").value;
+            if (!begin || !seconds) {
+                alert("must specify loop start and duration");
+                return;
+            }
+            const ms = begin * 1000;
+            console.log(`${thisLoopId} start looping from ${begin}s(${ms}ms) for ${seconds}s`)
+            doLoop(thisLoopId, begin, seconds);
         }
     });
 </script>
