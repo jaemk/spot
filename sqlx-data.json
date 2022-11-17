@@ -104,6 +104,11 @@
           "name": "revoked",
           "ordinal": 14,
           "type_info": "Bool"
+        },
+        {
+          "name": "poll_enabled",
+          "ordinal": 15,
+          "type_info": "Bool"
         }
       ],
       "nullable": [
@@ -121,6 +126,7 @@
         false,
         true,
         true,
+        false,
         false
       ],
       "parameters": {
@@ -220,6 +226,11 @@
           "name": "revoked",
           "ordinal": 14,
           "type_info": "Bool"
+        },
+        {
+          "name": "poll_enabled",
+          "ordinal": 15,
+          "type_info": "Bool"
         }
       ],
       "nullable": [
@@ -237,6 +248,7 @@
         false,
         true,
         true,
+        false,
         false
       ],
       "parameters": {
@@ -250,81 +262,7 @@
     },
     "query": "\n        update spot.users set access_token = $1, access_nonce = $2, access_expires = $3, modified = now() where id = $4 returning *\n        "
   },
-  "379b474cc9977f97dd8726afd9d0e9582362e6cbf8aa60e16613c23b72afd9af": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "user_id",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "spotify_id",
-          "ordinal": 2,
-          "type_info": "Text"
-        },
-        {
-          "name": "played_at",
-          "ordinal": 3,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "played_at_minute",
-          "ordinal": 4,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "name",
-          "ordinal": 5,
-          "type_info": "Text"
-        },
-        {
-          "name": "created",
-          "ordinal": 6,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "modified",
-          "ordinal": 7,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "artist_names",
-          "ordinal": 8,
-          "type_info": "TextArray"
-        },
-        {
-          "name": "last_known_listen",
-          "ordinal": 9,
-          "type_info": "Timestamptz"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true
-      ],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n            select * from spot.plays where user_id = $1\n            order by played_at desc\n            limit 1\n            "
-  },
-  "66206597205a7dc14357cd3e6cd0cc052fffd22e5048f0aab73aa98aae551459": {
+  "2fd55cc67d12e2ce8c61ea49ccda6db4e8504fc692ec1d31321a30fb832dfa6e": {
     "describe": {
       "columns": [
         {
@@ -401,6 +339,11 @@
           "name": "revoked",
           "ordinal": 14,
           "type_info": "Bool"
+        },
+        {
+          "name": "poll_enabled",
+          "ordinal": 15,
+          "type_info": "Bool"
         }
       ],
       "nullable": [
@@ -418,6 +361,7 @@
         false,
         true,
         true,
+        false,
         false
       ],
       "parameters": {
@@ -427,7 +371,81 @@
         ]
       }
     },
-    "query": "\n        select * from spot.users\n        where\n            revoked is false\n            -- hack for now, only poll me\n            and email = 'james@kominick.com'\n            and (\n                (last_known_listen >= $1 and last_poll < $2)\n                or last_known_listen is null\n                or last_poll is null\n            )\n        "
+    "query": "\n        select * from spot.users\n        where\n            revoked is false\n            and poll_enabled is true\n            and (\n                (last_known_listen >= $1 and last_poll < $2)\n                or last_known_listen is null\n                or last_poll is null\n            )\n        "
+  },
+  "379b474cc9977f97dd8726afd9d0e9582362e6cbf8aa60e16613c23b72afd9af": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Int8"
+        },
+        {
+          "name": "spotify_id",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "played_at",
+          "ordinal": 3,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "played_at_minute",
+          "ordinal": 4,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "name",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "created",
+          "ordinal": 6,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "modified",
+          "ordinal": 7,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "artist_names",
+          "ordinal": 8,
+          "type_info": "TextArray"
+        },
+        {
+          "name": "last_known_listen",
+          "ordinal": 9,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            select * from spot.plays where user_id = $1\n            order by played_at desc\n            limit 1\n            "
   },
   "66d153501ce8b3b5249e7a25bab8f7468c67ae855356d1fbeced65b4aa24414f": {
     "describe": {
@@ -543,6 +561,11 @@
           "name": "revoked",
           "ordinal": 14,
           "type_info": "Bool"
+        },
+        {
+          "name": "poll_enabled",
+          "ordinal": 15,
+          "type_info": "Bool"
         }
       ],
       "nullable": [
@@ -560,6 +583,7 @@
         false,
         true,
         true,
+        false,
         false
       ],
       "parameters": {
@@ -810,7 +834,19 @@
     },
     "query": "\n        with src as (\n            select artist_names, count(*)\n            from spot.plays\n            where user_id = $1\n            group by artist_names\n        )\n        select artist_names, count\n        from src\n        order by count desc\n        limit 10\n        "
   },
-  "c7ccbcb02ceabca2a730ec438cff1e26209955134d225516b5b57020cab44cff": {
+  "eb5f3766a684ed1aa7c9cc83d5aff849b26e865a61c5da04ab79f6a1c7c361cd": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n            update spot.users\n                set last_known_listen = now()\n                where id = $1\n            "
+  },
+  "eb77ccc1db66b8d1eaf1c2c2b681812d573e3889d0ce8bb26dd1a4108374d68d": {
     "describe": {
       "columns": [
         {
@@ -887,6 +923,11 @@
           "name": "revoked",
           "ordinal": 14,
           "type_info": "Bool"
+        },
+        {
+          "name": "poll_enabled",
+          "ordinal": 15,
+          "type_info": "Bool"
         }
       ],
       "nullable": [
@@ -904,6 +945,7 @@
         false,
         true,
         true,
+        false,
         false
       ],
       "parameters": {
@@ -913,19 +955,7 @@
         ]
       }
     },
-    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n            and revoked is false\n            -- hack for now, only poll me\n            and email = 'james@kominick.com'\n        "
-  },
-  "eb5f3766a684ed1aa7c9cc83d5aff849b26e865a61c5da04ab79f6a1c7c361cd": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n            update spot.users\n                set last_known_listen = now()\n                where id = $1\n            "
+    "query": "\n        select * from spot.users\n        where last_known_listen < $1\n            and last_poll < $2\n            and revoked is false\n            and poll_enabled is true\n        "
   },
   "ef3f8442850134c61c710e1ad0ff23c838f3730e2449d7abda72961100f9e72f": {
     "describe": {

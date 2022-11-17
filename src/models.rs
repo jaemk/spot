@@ -76,6 +76,7 @@ pub struct User {
     pub auth_token: String,
 
     pub revoked: bool,
+    pub poll_enabled: bool,
 }
 
 #[derive(sqlx::FromRow, Debug, serde::Serialize)]

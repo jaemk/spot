@@ -961,8 +961,7 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         select * from spot.users
         where
             revoked is false
-            -- hack for now, only poll me
-            and email = 'james@kominick.com'
+            and poll_enabled is true
             and (
                 (last_known_listen >= $1 and last_poll < $2)
                 or last_known_listen is null
@@ -985,8 +984,7 @@ async fn _background_currently_playing_poll_inner(pool: &PgPool) -> Result<()> {
         where last_known_listen < $1
             and last_poll < $2
             and revoked is false
-            -- hack for now, only poll me
-            and email = 'james@kominick.com'
+            and poll_enabled is true
         ",
         &two_minutes_ago,
         &thirty_seconds_ago,

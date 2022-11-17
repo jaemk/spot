@@ -67,7 +67,7 @@ lazy_static::lazy_static! {
     pub static ref LOG: slog::Logger = BASE_LOG.new(slog::o!("app" => "spot"));
 
     // state cache
-    pub static ref ONE_TIME_TOKENS: Arc<Mutex<TimedCache<String, ()>>> = Arc::new(Mutex::new(TimedCache::with_lifespan(30)));
+    pub static ref ONE_TIME_TOKENS: Arc<Mutex<TimedCache<String, ()>>> = Arc::new(Mutex::new(TimedCache::with_lifespan(120)));
 }
 
 // build a string error
