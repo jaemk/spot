@@ -7,7 +7,7 @@ processes = []
 
 [env]
   DB_HOST = "kom-pg.internal"
-  DB_NAME = "soundlog"
+  DB_NAME = "spot"
   DB_PORT = "5432"
   DB_USER = "spot"
   HOST = "0.0.0.0"
