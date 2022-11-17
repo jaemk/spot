@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>soundlog</title>
+    <title>spotie</title>
 </head>
 <body>
 
@@ -111,12 +111,23 @@
                     }
                 }
                 console.log(`currently playing ${track} by ${artists}, position: ${seconds}s`);
+                const needsDeviceRefresh = trackTitle !== track;
                 trackTotal = total;
                 trackTitle = track;
                 trackArtists = artists;
-                setInfo(seconds, total, track, artists);
-                if (after) {
-                    after({seconds, track, artists, total});
+
+                if (needsDeviceRefresh) {
+                   getDevices(token, () => {
+                       setInfo();
+                       if (after) {
+                           after({seconds, track, artists, total});
+                       }
+                   });
+                } else {
+                    setInfo();
+                    if (after) {
+                        after({seconds, track, artists, total});
+                    }
                 }
             }
         })

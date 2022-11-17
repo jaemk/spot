@@ -1,6 +1,6 @@
-# soundlog
+# spot
 
-> Track your spotify play history
+> Spotify utilities
 
 
 ## Setup
