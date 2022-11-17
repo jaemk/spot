@@ -29,6 +29,7 @@ impl LogMiddleware {
         req.set_ext(LogMiddlewareHasBeenRun);
 
         let path = req.url().path().to_owned();
+        let log_debug = path == "/status";
         let method = req.method().to_string();
         let start = std::time::Instant::now();
         let log = LOG.new(slog::o!("method" => method, "path" => path));
@@ -55,10 +56,19 @@ impl LogMiddleware {
                 slog::warn!(log, "Unknown client error");
             }
         }
-        slog::info!(log, "handled request";
-            "status" => format!("{} - {}", status as u16, status.canonical_reason()),
-            "duration" => format!("{:?}", start.elapsed()),
-        );
+        if log_debug {
+            slog::debug!(
+                log, "handled request";
+                "status" => format!("{} - {}", status as u16, status.canonical_reason()),
+                "duration" => format!("{:?}", start.elapsed()),
+            );
+        } else {
+            slog::info!(
+                log, "handled request";
+                "status" => format!("{} - {}", status as u16, status.canonical_reason()),
+                "duration" => format!("{:?}", start.elapsed()),
+            );
+        }
         Ok(response)
     }
 }
