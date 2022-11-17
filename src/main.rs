@@ -73,7 +73,7 @@ lazy_static::lazy_static! {
 // build a string error
 #[macro_export]
 macro_rules! se {
-    ($($arg:tt)*) => {{ crate::StringError(format!($($arg)*))}};
+    ($($arg:tt)*) => {{ $crate::StringError(format!($($arg)*))}};
 }
 
 #[macro_export]
