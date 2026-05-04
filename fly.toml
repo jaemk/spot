@@ -6,7 +6,7 @@ kill_timeout = 5
 processes = []
 
 [env]
-  DB_HOST = "kom-pg.internal"
+  DB_HOST = "kom-db.flycast"
   DB_NAME = "spot"
   DB_PORT = "5432"
   DB_USER = "spot"

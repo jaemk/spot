@@ -1,5 +1,6 @@
-FROM rust:1.58.1-bullseye as builder
+FROM rust:1.95.0-bookworm as builder
 
+RUN apt-get update && apt-get install --yes ca-certificates curl pkg-config libssl-dev libpq-dev
 RUN cargo install migrant --features postgres
 
 # create a new empty shell
@@ -43,8 +44,8 @@ COPY ./migrations ./migrations
 RUN cp ./target/release/spot ./bin/spot
 RUN rm -rf ./target
 
-FROM debian:bullseye-slim
-RUN apt-get update && apt-get install --yes ca-certificates curl
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install --yes ca-certificates curl libssl3 libpq5
 COPY --from=builder /spot ./spot
 COPY --from=builder /usr/local/cargo/bin/migrant /usr/bin/migrant
 WORKDIR /spot
